@@ -8,6 +8,11 @@ import {
   Sunrise,
   ArrowRight,
   Map,
+  Compass,
+  MessageCircle,
+  Flame,
+  Wallet,
+  Rocket,
 } from "lucide-react";
 import type { LifeBlueprint } from "@/types";
 import { ButtonLink } from "@/components/ui/button-link";
@@ -31,6 +36,8 @@ function TextCard({
   icon: React.ElementType;
   highlight?: boolean;
 }) {
+  if (!content?.trim()) return null;
+
   return (
     <Card
       className={
@@ -63,6 +70,8 @@ function ListCard({
   items: string[];
   icon: React.ElementType;
 }) {
+  if (!items?.length) return null;
+
   return (
     <Card className="border-border/50">
       <CardHeader>
@@ -101,33 +110,51 @@ export function BlueprintDisplay({ blueprint }: { blueprint: LifeBlueprint }) {
         <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
           Navigate Your Future
         </h1>
-        <p className="mt-2 text-muted-foreground">
-          Generated {new Date(blueprint.createdAt).toLocaleDateString()}
-        </p>
+        <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+          <Badge className="bg-gradient-to-r from-teal-500 to-indigo-600 text-white">
+            <Compass className="mr-1 h-3 w-3" />
+            {blueprint.archetype}
+          </Badge>
+          <span className="text-sm text-muted-foreground">
+            Generated {new Date(blueprint.createdAt).toLocaleDateString()}
+          </span>
+        </div>
       </div>
+
+      <TextCard
+        title="LifeGPS Archetype Summary"
+        content={blueprint.archetypeSummary}
+        icon={Compass}
+        highlight
+      />
+
+      <TextCard
+        title="Compass Score Overview"
+        content={blueprint.compassScoreOverview}
+        icon={Target}
+      />
 
       <TextCard
         title="Future Self Summary"
         content={blueprint.futureSelfSummary}
         icon={Sparkles}
-        highlight
       />
 
       <div className="grid gap-6 md:grid-cols-2">
         <TextCard
-          title="Current State Analysis"
+          title="Current Life Diagnosis"
           content={blueprint.currentStateAnalysis}
           icon={Target}
         />
         <TextCard
-          title="Dream Life Vision"
+          title="Dream Life Direction"
           content={blueprint.dreamLifeVision}
           icon={Map}
         />
       </div>
 
       <TextCard
-        title="Gap Analysis"
+        title="Key Gaps"
         content={blueprint.gapAnalysis}
         icon={Target}
       />
@@ -140,7 +167,7 @@ export function BlueprintDisplay({ blueprint }: { blueprint: LifeBlueprint }) {
 
       <div className="grid gap-6 md:grid-cols-2">
         <ListCard
-          title="12-Month Plan"
+          title="12-Month Strategy"
           items={blueprint.twelveMonthPlan}
           icon={Calendar}
         />
@@ -151,16 +178,54 @@ export function BlueprintDisplay({ blueprint }: { blueprint: LifeBlueprint }) {
         />
       </div>
 
+      <ListCard
+        title="7-Day Starter Plan"
+        items={blueprint.sevenDayStarterPlan}
+        icon={Rocket}
+      />
+
       <div className="grid gap-6 md:grid-cols-2">
         <ListCard
-          title="Weekly Priorities"
-          items={blueprint.weeklyPriorities}
-          icon={ListChecks}
-        />
-        <ListCard
-          title="Daily Habits"
+          title="3 Daily Habits"
           items={blueprint.dailyHabits}
           icon={Sunrise}
+        />
+        <ListCard
+          title="Recommended Weekly Check-In Questions"
+          items={blueprint.weeklyCheckInQuestions}
+          icon={MessageCircle}
+        />
+      </div>
+
+      <ListCard
+        title="Weekly Priorities"
+        items={blueprint.weeklyPriorities}
+        icon={ListChecks}
+      />
+
+      <div className="grid gap-6 md:grid-cols-2">
+        <TextCard
+          title="Suggested Side Business Direction"
+          content={blueprint.sideBusinessDirection ?? ""}
+          icon={Rocket}
+        />
+        <TextCard
+          title="Suggested Communication Growth Plan"
+          content={blueprint.communicationGrowthPlan ?? ""}
+          icon={MessageCircle}
+        />
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-2">
+        <TextCard
+          title="Burnout Recovery Actions"
+          content={blueprint.burnoutRecoveryActions ?? ""}
+          icon={Flame}
+        />
+        <TextCard
+          title="Early Retirement / Financial Freedom Notes"
+          content={blueprint.financialFreedomNotes ?? ""}
+          icon={Wallet}
         />
       </div>
 

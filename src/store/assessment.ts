@@ -1,33 +1,14 @@
 import { atom } from "jotai";
-import type { AssessmentData } from "@/types";
+import type { AssessmentPhase, CompassAnswer, CompassAssessment } from "@/types";
 
-export const defaultAssessment: AssessmentData = {
-  name: "",
-  ageRange: "",
-  location: "",
-  currentJob: "",
-  familySituation: "",
-  mbtiType: "",
-  keyStrengths: "",
-  weaknesses: "",
-  communicationStyle: "",
-  careerSatisfaction: 5,
-  energyBurnout: 5,
-  financialSituation: "",
-  healthLifestyle: "",
-  workLifeBalance: "",
-  idealLife: "",
-  desiredCareer: "",
-  desiredIncome: "",
-  sideBusinessIdeas: "",
-  earlyRetirementGoal: "",
-  biggestDream: "",
-  whatIsStopping: "",
-  timeConstraints: "",
-  confidenceIssues: "",
-  skillsGaps: "",
-  financialPressure: "",
+export const defaultCompassAssessment: CompassAssessment = {
+  answers: [],
+  results: null,
 };
 
-export const assessmentAtom = atom<AssessmentData>(defaultAssessment);
-export const currentStepAtom = atom(0);
+export const compassAssessmentAtom = atom<CompassAssessment>(defaultCompassAssessment);
+export const currentQuestionAtom = atom(0);
+export const assessmentPhaseAtom = atom<AssessmentPhase>("intro");
+
+/** Map of questionId → answer for quick lookup during the session */
+export const compassAnswersMapAtom = atom<Record<number, CompassAnswer>>({});

@@ -16,9 +16,9 @@ import {
 const features = [
   {
     icon: Brain,
-    title: "Personality & Life Assessment",
+    title: "LifeGPS Compass™ Assessment",
     description:
-      "Deep dive into your strengths, challenges, and current life situation.",
+      "An interactive 8-minute personality-style questionnaire across 8 life dimensions.",
   },
   {
     icon: MapPinned,

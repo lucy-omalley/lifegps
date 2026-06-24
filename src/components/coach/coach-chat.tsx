@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Loader2, Send, Bot, User } from "lucide-react";
-import { getMockUser } from "@/lib/auth";
+import { ensureAuthenticatedUser } from "@/lib/auth";
 import { saveCheckin } from "@/lib/storage";
 import type { WeeklyCheckin } from "@/types";
 import { Button } from "@/components/ui/button";
@@ -59,11 +59,11 @@ export function CoachChat() {
     setSubmitted(true);
 
     try {
-      const user = getMockUser();
+      await ensureAuthenticatedUser();
       const response = await fetch("/api/coach", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...answers, userId: user.id }),
+        body: JSON.stringify(answers),
       });
 
       if (!response.ok) throw new Error("Failed");
@@ -73,7 +73,7 @@ export function CoachChat() {
 
       const checkin: WeeklyCheckin = {
         id: data.id,
-        userId: user.id,
+        userId: "",
         ...answers,
         aiResponse: data.aiResponse,
         createdAt: data.createdAt,

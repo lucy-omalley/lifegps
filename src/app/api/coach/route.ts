@@ -4,7 +4,7 @@ import {
   LIFEGPS_SYSTEM_PROMPT,
   COACH_USER_PROMPT,
 } from "@/lib/openai/prompts";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { getAuthenticatedUser } from "@/lib/supabase/server";
 
 function generateMockCoachResponse(checkin: {
   progress: string;
@@ -27,18 +27,20 @@ Remember: you're building a life, not sprinting a race. Stay consistent, stay ki
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const { progress, blockers, supportNeeded, nextPriority, userId } =
-      body as {
-        progress: string;
-        blockers: string;
-        supportNeeded: string;
-        nextPriority: string;
-        userId: string;
-      };
+    const { supabase, user } = await getAuthenticatedUser();
 
+    const body = await request.json();
+    const { progress, blockers, supportNeeded, nextPriority } = body as {
+      progress: string;
+      blockers: string;
+      supportNeeded: string;
+      nextPriority: string;
+      userId?: string;
+    };
+
+    const userId = user?.id ?? body.userId;
     if (!userId) {
-      return NextResponse.json({ error: "userId is required" }, { status: 400 });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const checkin = { progress, blockers, supportNeeded, nextPriority };
@@ -62,25 +64,29 @@ export async function POST(request: Request) {
     }
 
     const checkinId = crypto.randomUUID();
+    const createdAt = new Date().toISOString();
 
-    // TODO: Persist to Supabase when configured
-    const supabase = createServerSupabaseClient();
-    if (supabase) {
-      await supabase.from("weekly_checkins").insert({
+    if (supabase && user) {
+      const { error } = await supabase.from("weekly_checkins").insert({
         id: checkinId,
-        user_id: userId,
+        user_id: user.id,
         progress,
         blockers,
         support_needed: supportNeeded,
         next_priority: nextPriority,
         ai_response: aiResponse,
       });
+
+      if (error) {
+        console.error("Checkin insert error:", error);
+      }
     }
 
     return NextResponse.json({
       id: checkinId,
       aiResponse,
-      createdAt: new Date().toISOString(),
+      createdAt,
+      persisted: Boolean(supabase && user),
     });
   } catch (error) {
     console.error("Coach error:", error);

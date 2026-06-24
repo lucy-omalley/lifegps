@@ -5,7 +5,7 @@ import { Compass } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
 import { BlueprintDisplay } from "@/components/blueprint/blueprint-display";
-import { getBlueprint } from "@/lib/storage";
+import { loadBlueprintWithFallback } from "@/lib/data/sync";
 import type { LifeBlueprint } from "@/types";
 import { ButtonLink } from "@/components/ui/button-link";
 
@@ -14,8 +14,10 @@ export default function BlueprintPage() {
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    setBlueprint(getBlueprint());
-    setLoaded(true);
+    loadBlueprintWithFallback().then((data) => {
+      setBlueprint(data);
+      setLoaded(true);
+    });
   }, []);
 
   return (
@@ -36,14 +38,14 @@ export default function BlueprintPage() {
               </div>
               <h1 className="text-2xl font-bold">No Blueprint Found</h1>
               <p className="mt-2 text-muted-foreground">
-                Complete the assessment to generate your personalized Life
+                Complete the Compass assessment to generate your personalized Life
                 Blueprint.
               </p>
               <ButtonLink
                 href="/assessment"
                 className="mt-6 bg-gradient-to-r from-teal-500 to-indigo-600 text-white"
               >
-                Start Assessment
+                Start Compass Assessment
               </ButtonLink>
             </div>
           )}

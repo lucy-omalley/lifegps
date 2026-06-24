@@ -4,76 +4,173 @@ import {
   LIFEGPS_SYSTEM_PROMPT,
   BLUEPRINT_USER_PROMPT,
 } from "@/lib/openai/prompts";
-import { createServerSupabaseClient } from "@/lib/supabase/server";
-import type { AssessmentData, LifeBlueprint } from "@/types";
+import { formatDimensionScoresForDisplay } from "@/lib/compass/scoring";
+import { blueprintFromRow, blueprintToRow } from "@/lib/supabase/mappers";
+import { getAuthenticatedUser } from "@/lib/supabase/server";
+import type { CompassAssessment, LifeBlueprint } from "@/types";
 
 function generateMockBlueprint(
-  assessment: AssessmentData,
+  assessment: CompassAssessment,
   userId: string
 ): LifeBlueprint {
+  const results = assessment.results!;
   const id = crypto.randomUUID();
+  const firstOutcome =
+    assessment.answers.find((a) => a.questionId === 50)?.selectedAnswer ??
+    "More clarity";
+
+  const showSideBusiness =
+    results.sideBusinessReadiness.includes("High") ||
+    results.sideBusinessReadiness.includes("Active") ||
+    results.sideBusinessReadiness.includes("Exploring");
+
+  const showCommunication =
+    results.dimensionScores.communicationConfidence < 65 ||
+    results.topGrowthAreas.some((g) => g.includes("Communication"));
+
+  const showBurnout =
+    results.burnoutRisk === "Medium" || results.burnoutRisk === "High";
+
+  const showFinancial =
+    results.dimensionScores.financialFreedom >= 50 ||
+    results.financialFreedomReadiness.includes("Developing") ||
+    results.financialFreedomReadiness.includes("Strong");
+
   return {
     id,
     userId,
     assessmentId: crypto.randomUUID(),
     createdAt: new Date().toISOString(),
-    futureSelfSummary: `${assessment.name || "You"} have transformed from ${assessment.currentJob || "your current role"} into someone living ${assessment.desiredCareer || "your dream career"}. In five years, you've built the life you described: ${assessment.idealLife?.slice(0, 120) || "a balanced, fulfilling life"}... You've escaped the burnout cycle and now operate with clarity and purpose.`,
-    currentStateAnalysis: `You're currently working as ${assessment.currentJob || "a professional"} with career satisfaction at ${assessment.careerSatisfaction}/10 and energy/burnout at ${assessment.energyBurnout}/10. Your strengths in ${assessment.keyStrengths || "your core skills"} position you well, though ${assessment.weaknesses || "some challenges"} need attention. Financially: ${assessment.financialSituation || "stable but seeking growth"}.`,
-    dreamLifeVision: assessment.idealLife || `A life where you thrive in ${assessment.desiredCareer}, earning ${assessment.desiredIncome}, with ${assessment.workLifeBalance} work-life balance. Your biggest dream: ${assessment.biggestDream}.`,
-    gapAnalysis: `Key gaps: ${assessment.skillsGaps || "skill development needed"}. Barriers include ${assessment.whatIsStopping || "uncertainty"}. Time constraints: ${assessment.timeConstraints || "limited bandwidth"}. Confidence: ${assessment.confidenceIssues || "building self-belief"}.`,
+    archetype: results.archetype,
+    archetypeSummary: `As ${results.archetype}, ${results.archetypeDescription} Your Compass profile shows strengths in ${results.topStrengths.join(" and ")}, with growth opportunities in ${results.topGrowthAreas.join(" and ")}.`,
+    compassScoreOverview: formatDimensionScoresForDisplay(
+      results.dimensionScores
+    ),
+    futureSelfSummary: `In five years, you have moved from uncertainty toward ${firstOutcome.toLowerCase()}. Your ${results.archetype.replace("The ", "").toLowerCase()} energy has guided you to build a life aligned with your values — with clearer direction, stronger habits, and meaningful progress in your priority areas.`,
+    currentStateAnalysis: `Your Compass assessment reveals a ${results.burnoutRisk.toLowerCase()} burnout risk profile. ${results.executionStyle}. Career energy scores ${results.dimensionScores.careerEnergy}/100, while energy & lifestyle sits at ${results.dimensionScores.energyLifestyle}/100. You are ${results.financialFreedomReadiness.toLowerCase()} regarding financial freedom, and ${results.sideBusinessReadiness.toLowerCase()} on side business exploration.`,
+    dreamLifeVision: `Your dream life centres on ${results.topStrengths[0]?.toLowerCase() ?? "purpose"} while addressing ${results.topGrowthAreas[0]?.toLowerCase() ?? "key growth areas"}. The first outcome you want from your blueprint is: ${firstOutcome}.`,
+    gapAnalysis: `Key gaps exist between your current scores and your desired future. Focus areas: ${results.topGrowthAreas.join(" and ")}. Your ${results.burnoutRisk.toLowerCase()} burnout risk suggests ${showBurnout ? "energy recovery should be prioritised alongside goal pursuit" : "you have reasonable energy to pursue ambitious goals"}.`,
     fiveYearRoadmap: [
-      "Year 1: Stabilize energy, clarify direction, start side exploration",
-      "Year 2: Build skills, launch side project, improve communication",
-      "Year 3: Transition or scale side business, increase income 30%",
-      "Year 4: Establish new career path, build passive income streams",
-      `Year 5: Achieve ${assessment.earlyRetirementGoal || "financial independence milestone"}`,
+      "Year 1: Stabilise energy, clarify direction, establish core habits",
+      "Year 2: Build skills in growth areas, explore side income options",
+      "Year 3: Accelerate career or business transition, deepen confidence",
+      "Year 4: Scale what works, reduce dependence on unsatisfying work",
+      "Year 5: Achieve your primary life outcome with sustainable systems",
     ],
     twelveMonthPlan: [
-      "Q1: Complete skills audit, reduce burnout, define 90-day goals",
-      "Q2: Launch first side business experiment, network actively",
-      "Q3: Refine offering, improve work-life boundaries",
-      "Q4: Evaluate progress, plan Year 2 transition",
+      "Q1: Complete Compass-aligned goals audit and 90-day sprint",
+      "Q2: Launch one experiment in your top growth area",
+      "Q3: Build accountability systems and refine weekly rhythm",
+      "Q4: Evaluate progress and plan Year 2 transition",
     ],
     ninetyDayActionPlan: [
-      "Week 1-2: Block 30 min daily for life planning and reflection",
-      `Research ${assessment.sideBusinessIdeas || "side business options"} — talk to 3 people doing it`,
-      "Identify one skill gap and enroll in a course or mentorship",
-      "Set one boundary to improve work-life balance this month",
-      "Take one small action toward your biggest dream today",
-    ].slice(0, 5) as string[],
-    weeklyPriorities: [
-      "Protect 2 hours for deep work on personal goals",
-      "Complete one learning module or skill practice session",
-      "Have one meaningful conversation about your future direction",
+      "Week 1-2: Define your top 3 priorities from Compass growth areas",
+      "Week 3-4: Block protected time for your highest-leverage habit",
+      "Week 5-8: Take one bold action toward your first desired outcome",
+      "Week 9-10: Review dimension scores and adjust your approach",
+      "Week 11-12: Celebrate wins and set next 90-day focus",
+    ],
+    sevenDayStarterPlan: [
+      "Days 1-2: Write your one-sentence vision and share it with someone you trust",
+      "Days 3-4: Complete one small action in your weakest Compass dimension",
+      "Days 5-7: Establish one daily habit from your blueprint and track it",
     ],
     dailyHabits: [
-      "10-minute morning intention setting",
-      "30-minute walk or movement break",
-      "Evening reflection: one win, one lesson",
-      "Read 15 minutes on career or business growth",
+      "10-minute morning intention aligned with your archetype",
+      "One focused block on your top growth area",
+      "Evening reflection: one win, one lesson, one tomorrow priority",
     ],
-    recommendedFirstStep: `Start today: write down your version of "${assessment.biggestDream || "your dream"}" in one sentence, then identify the smallest possible action you can take in the next 24 hours.`,
+    weeklyCheckInQuestions: [
+      "What progress did I make on my top growth area this week?",
+      "What drained my energy, and how can I protect against it?",
+      "What is the one priority that would make next week a success?",
+    ],
+    weeklyPriorities: [
+      "Protect 2 hours for deep work on personal goals",
+      "Complete one learning or practice session in a growth area",
+      "Have one meaningful conversation about your future direction",
+    ],
+    sideBusinessDirection: showSideBusiness
+      ? "Based on your side business readiness, start with a low-risk experiment: validate one idea with 5 conversations before building anything. Focus on your preferred working style from the assessment."
+      : "",
+    communicationGrowthPlan: showCommunication
+      ? "Practice one communication skill weekly: start with speaking up once in every meeting, or rehearsing key messages before important conversations. Consider a communication coach or course."
+      : "",
+    burnoutRecoveryActions: showBurnout
+      ? "Prioritise recovery: set one non-negotiable boundary this week, schedule daily 15-minute breaks, and reduce one draining commitment. Seek professional support if burnout feels unmanageable."
+      : "",
+    financialFreedomNotes: showFinancial
+      ? "Build your financial foundation: track spending for 30 days, establish or grow an emergency fund, and explore one side income stream aligned with your skills. Consult a qualified financial adviser for personalised investment guidance."
+      : "",
+    recommendedFirstStep: `Today: identify the smallest action toward "${firstOutcome}" that you can complete in the next 24 hours. Write it down and schedule it.`,
   };
+}
+
+export async function GET() {
+  const { supabase, user } = await getAuthenticatedUser();
+
+  if (!supabase || !user) {
+    return NextResponse.json({ blueprint: null, source: "none" });
+  }
+
+  const { data, error } = await supabase
+    .from("life_blueprints")
+    .select("*")
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    console.error("Load blueprint error:", error);
+    return NextResponse.json(
+      { error: "Failed to load blueprint" },
+      { status: 500 }
+    );
+  }
+
+  if (!data) {
+    return NextResponse.json({ blueprint: null, source: "database" });
+  }
+
+  return NextResponse.json({
+    blueprint: blueprintFromRow(data),
+    source: "database",
+  });
 }
 
 export async function POST(request: Request) {
   try {
+    const { supabase, user } = await getAuthenticatedUser();
+
     const body = await request.json();
-    const { assessment, userId } = body as {
-      assessment: AssessmentData;
-      userId: string;
+    const { assessment, userId: bodyUserId } = body as {
+      assessment: CompassAssessment;
+      userId?: string;
     };
 
-    if (!assessment || !userId) {
+    if (!assessment) {
       return NextResponse.json(
-        { error: "Assessment data and userId are required" },
+        { error: "Assessment data is required" },
         { status: 400 }
       );
     }
 
+    if (!assessment.results || assessment.answers.length < 50) {
+      return NextResponse.json(
+        { error: "Complete Compass assessment with results is required" },
+        { status: 400 }
+      );
+    }
+
+    const userId = user?.id ?? bodyUserId;
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     let blueprintData: Omit<
       LifeBlueprint,
-      "id" | "userId" | "assessmentId" | "createdAt"
+      "id" | "userId" | "assessmentId" | "createdAt" | "archetype"
     >;
 
     if (process.env.OPENAI_API_KEY) {
@@ -97,6 +194,8 @@ export async function POST(request: Request) {
     } else {
       const mock = generateMockBlueprint(assessment, userId);
       blueprintData = {
+        archetypeSummary: mock.archetypeSummary,
+        compassScoreOverview: mock.compassScoreOverview,
         futureSelfSummary: mock.futureSelfSummary,
         currentStateAnalysis: mock.currentStateAnalysis,
         dreamLifeVision: mock.dreamLifeVision,
@@ -104,8 +203,14 @@ export async function POST(request: Request) {
         fiveYearRoadmap: mock.fiveYearRoadmap,
         twelveMonthPlan: mock.twelveMonthPlan,
         ninetyDayActionPlan: mock.ninetyDayActionPlan,
-        weeklyPriorities: mock.weeklyPriorities,
+        sevenDayStarterPlan: mock.sevenDayStarterPlan,
         dailyHabits: mock.dailyHabits,
+        weeklyCheckInQuestions: mock.weeklyCheckInQuestions,
+        weeklyPriorities: mock.weeklyPriorities,
+        sideBusinessDirection: mock.sideBusinessDirection,
+        communicationGrowthPlan: mock.communicationGrowthPlan,
+        burnoutRecoveryActions: mock.burnoutRecoveryActions,
+        financialFreedomNotes: mock.financialFreedomNotes,
         recommendedFirstStep: mock.recommendedFirstStep,
       };
     }
@@ -116,35 +221,40 @@ export async function POST(request: Request) {
       userId,
       assessmentId,
       createdAt: new Date().toISOString(),
+      archetype: assessment.results.archetype,
       ...blueprintData,
     };
 
-    // TODO: Persist to Supabase when configured
-    const supabase = createServerSupabaseClient();
-    if (supabase) {
-      await supabase.from("assessments").insert({
-        id: assessmentId,
-        user_id: userId,
-        data: assessment,
-      });
-      await supabase.from("life_blueprints").insert({
-        id: blueprint.id,
-        user_id: userId,
-        assessment_id: assessmentId,
-        future_self_summary: blueprint.futureSelfSummary,
-        current_state_analysis: blueprint.currentStateAnalysis,
-        dream_life_vision: blueprint.dreamLifeVision,
-        gap_analysis: blueprint.gapAnalysis,
-        five_year_roadmap: blueprint.fiveYearRoadmap,
-        twelve_month_plan: blueprint.twelveMonthPlan,
-        ninety_day_action_plan: blueprint.ninetyDayActionPlan,
-        weekly_priorities: blueprint.weeklyPriorities,
-        daily_habits: blueprint.dailyHabits,
-        recommended_first_step: blueprint.recommendedFirstStep,
-      });
+    if (supabase && user) {
+      const { error: assessmentError } = await supabase
+        .from("assessments")
+        .insert({
+          id: assessmentId,
+          user_id: user.id,
+          data: assessment,
+          is_complete: true,
+          completed_at: assessment.completedAt ?? new Date().toISOString(),
+        });
+
+      if (assessmentError) {
+        console.error("Assessment insert error:", assessmentError);
+        throw new Error("Failed to save assessment");
+      }
+
+      const row = blueprintToRow(blueprint, assessmentId);
+      const { error: blueprintError } = await supabase
+        .from("life_blueprints")
+        .insert(row);
+
+      if (blueprintError) {
+        console.error("Blueprint insert error:", blueprintError);
+        throw new Error("Failed to save blueprint");
+      }
+
+      await supabase.from("compass_sessions").delete().eq("user_id", user.id);
     }
 
-    return NextResponse.json({ blueprint });
+    return NextResponse.json({ blueprint, persisted: Boolean(supabase && user) });
   } catch (error) {
     console.error("Blueprint generation error:", error);
     return NextResponse.json(

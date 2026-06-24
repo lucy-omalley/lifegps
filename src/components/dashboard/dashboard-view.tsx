@@ -9,7 +9,7 @@ import {
   MessageCircle,
   ArrowRight,
 } from "lucide-react";
-import { getBlueprint } from "@/lib/storage";
+import { loadBlueprintWithFallback } from "@/lib/data/sync";
 import type { LifeBlueprint } from "@/types";
 import { ButtonLink } from "@/components/ui/button-link";
 import {
@@ -26,8 +26,10 @@ export function DashboardView() {
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    setBlueprint(getBlueprint());
-    setLoaded(true);
+    loadBlueprintWithFallback().then((data) => {
+      setBlueprint(data);
+      setLoaded(true);
+    });
   }, []);
 
   if (!loaded) {
