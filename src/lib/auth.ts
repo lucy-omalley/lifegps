@@ -3,6 +3,7 @@ import {
   createBrowserSupabaseClient,
   isSupabaseConfigured,
 } from "@/lib/supabase/client";
+import { GUEST_COOKIE_NAME } from "@/lib/auth/paths";
 
 const MOCK_USER_KEY = "lifegps_mock_user";
 const AUTH_MODE_KEY = "lifegps_auth_mode";
@@ -167,13 +168,27 @@ export async function signOutUser() {
   if (typeof window !== "undefined") {
     localStorage.removeItem(MOCK_USER_KEY);
     localStorage.removeItem(AUTH_MODE_KEY);
+    clearGuestSession();
   }
 }
 
-export const PUBLIC_AUTH_PATHS = ["/", "/login", "/auth/callback"];
-
-export function isPublicAuthPath(pathname: string): boolean {
-  return PUBLIC_AUTH_PATHS.some(
-    (path) => pathname === path || pathname.startsWith("/auth/callback")
-  );
+export function setGuestSession() {
+  if (typeof document !== "undefined") {
+    document.cookie = `${GUEST_COOKIE_NAME}=1; path=/; max-age=604800; SameSite=Lax`;
+  }
+  if (typeof window !== "undefined") {
+    sessionStorage.setItem(GUEST_COOKIE_NAME, "1");
+  }
+  enableLocalStorageOnly();
 }
+
+export function clearGuestSession() {
+  if (typeof document !== "undefined") {
+    document.cookie = `${GUEST_COOKIE_NAME}=; path=/; max-age=0; SameSite=Lax`;
+  }
+  if (typeof window !== "undefined") {
+    sessionStorage.removeItem(GUEST_COOKIE_NAME);
+  }
+}
+
+export { isPublicAuthPath, isProtectedAuthPath } from "@/lib/auth/paths";

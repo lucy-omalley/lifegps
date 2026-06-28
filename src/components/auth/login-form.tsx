@@ -3,16 +3,15 @@
 import { useEffect, useRef, useState } from "react";
 import Script from "next/script";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { Loader2, Mail, Sparkles } from "lucide-react";
-import { sendMagicLink } from "@/lib/auth";
+import { sendMagicLink, setGuestSession } from "@/lib/auth";
 import {
   getTurnstileSiteKey,
   isCaptchaConfigured,
   TURNSTILE_SCRIPT_URL,
 } from "@/lib/auth/captcha";
 import { isSupabaseConfigured } from "@/lib/supabase/client";
-import { ButtonLink } from "@/components/ui/button-link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,6 +24,7 @@ import {
 } from "@/components/ui/card";
 
 export function LoginForm() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const next = searchParams.get("next") ?? "/journey";
   const errorParam = searchParams.get("error");
@@ -103,18 +103,27 @@ export function LoginForm() {
     return (
       <Card className="border-border/50">
         <CardHeader>
-          <CardTitle>Local mode</CardTitle>
+          <CardTitle>Sign in to LifeGPS</CardTitle>
           <CardDescription>
-            Supabase is not configured. The app uses browser storage only.
+            Cloud sync is not configured on this server. You can continue in
+            local-only mode — progress saves in this browser only.
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <ButtonLink
-            href={next}
-            className="w-full justify-center bg-gradient-to-r from-teal-500 to-indigo-600 text-white"
+        <CardContent className="space-y-3">
+          <Button
+            type="button"
+            className="w-full bg-gradient-to-r from-teal-500 to-indigo-600 text-white"
+            onClick={() => {
+              setGuestSession();
+              router.push(next);
+            }}
           >
-            Continue without sign-in
-          </ButtonLink>
+            Continue in local mode
+          </Button>
+          <p className="text-center text-xs text-muted-foreground">
+            To enable email sign-in, add Supabase keys to{" "}
+            <code className="text-[10px]">.env.local</code>
+          </p>
         </CardContent>
       </Card>
     );

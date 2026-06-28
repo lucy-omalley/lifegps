@@ -2,10 +2,25 @@
 
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { ensureAuthenticatedUser, isPublicAuthPath } from "@/lib/auth";
+import {
+  ensureAuthenticatedUser,
+  isPublicAuthPath,
+  setGuestSession,
+} from "@/lib/auth";
+import { GUEST_COOKIE_NAME } from "@/lib/auth/paths";
 import { isSupabaseConfigured } from "@/lib/supabase/client";
 
 type AuthState = "checking" | "allowed" | "needs_login";
+
+function hasGuestSession(): boolean {
+  if (typeof document !== "undefined") {
+    if (document.cookie.includes(`${GUEST_COOKIE_NAME}=1`)) return true;
+  }
+  if (typeof window !== "undefined") {
+    if (sessionStorage.getItem(GUEST_COOKIE_NAME) === "1") return true;
+  }
+  return false;
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -22,7 +37,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (!isSupabaseConfigured()) {
-        if (!cancelled) setAuthState("allowed");
+        if (hasGuestSession()) {
+          if (!cancelled) setAuthState("allowed");
+          return;
+        }
+        if (!cancelled) {
+          setAuthState("needs_login");
+          router.replace(`/login?next=${encodeURIComponent(pathname)}`);
+        }
         return;
       }
 
@@ -46,9 +68,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [pathname, router]);
 
-  const isProtectedRoute = !isPublicAuthPath(pathname) && isSupabaseConfigured();
+  const requiresAuth =
+    !isPublicAuthPath(pathname) &&
+    (isSupabaseConfigured() || !hasGuestSession());
 
-  if (isProtectedRoute && (authState === "checking" || authState === "needs_login")) {
+  if (requiresAuth && (authState === "checking" || authState === "needs_login")) {
     return (
       <div className="flex min-h-full flex-1 items-center justify-center">
         <p className="text-sm text-muted-foreground">
