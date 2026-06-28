@@ -4,7 +4,6 @@ export interface ArchetypeDefinition {
   id: LifeGPSArchetype;
   title: LifeGPSArchetype;
   description: string;
-  /** Primary dimensions that signal this archetype */
   signals: {
     dimension: string;
     minScore?: number;
@@ -21,7 +20,7 @@ export const ARCHETYPES: Record<LifeGPSArchetype, ArchetypeDefinition> = {
     signals: [
       { dimension: "purpose", minScore: 65 },
       { dimension: "execution", minScore: 60 },
-      { dimension: "growth", minScore: 60 },
+      { dimension: "career", minScore: 55 },
     ],
   },
   "The Burnout Escaper": {
@@ -30,8 +29,8 @@ export const ARCHETYPES: Record<LifeGPSArchetype, ArchetypeDefinition> = {
     description:
       "You have been running on empty for too long. Your path forward starts with restoring energy and redesigning how you work.",
     signals: [
-      { dimension: "energyLifestyle", maxScore: 45 },
-      { dimension: "careerEnergy", maxScore: 45 },
+      { dimension: "energy", maxScore: 45 },
+      { dimension: "career", maxScore: 45 },
     ],
   },
   "The Career Changer": {
@@ -40,8 +39,8 @@ export const ARCHETYPES: Record<LifeGPSArchetype, ArchetypeDefinition> = {
     description:
       "You feel ready for a new chapter. Your strength is self-awareness — now you need a clear transition strategy.",
     signals: [
-      { dimension: "careerEnergy", maxScore: 50 },
-      { dimension: "growth", minScore: 55 },
+      { dimension: "career", maxScore: 50 },
+      { dimension: "communication", minScore: 55 },
     ],
   },
   "The Freedom Seeker": {
@@ -50,7 +49,7 @@ export const ARCHETYPES: Record<LifeGPSArchetype, ArchetypeDefinition> = {
     description:
       "Freedom and flexibility drive you more than status. Your roadmap should prioritise income options and lifestyle design.",
     signals: [
-      { dimension: "financialFreedom", minScore: 60 },
+      { dimension: "freedom", minScore: 60 },
       { dimension: "purpose", minScore: 50 },
     ],
   },
@@ -67,8 +66,8 @@ export const ARCHETYPES: Record<LifeGPSArchetype, ArchetypeDefinition> = {
     description:
       "Communication is your growth edge and your superpower in waiting. With practice, your influence can accelerate every goal.",
     signals: [
-      { dimension: "communicationConfidence", minScore: 55 },
-      { dimension: "growth", minScore: 50 },
+      { dimension: "communication", minScore: 55 },
+      { dimension: "execution", minScore: 50 },
     ],
   },
   "The Creative Starter": {
@@ -77,8 +76,8 @@ export const ARCHETYPES: Record<LifeGPSArchetype, ArchetypeDefinition> = {
     description:
       "You have creative ideas and entrepreneurial energy. Your next step is choosing one path and building momentum.",
     signals: [
-      { dimension: "businessCreativity", minScore: 60 },
-      { dimension: "growth", minScore: 50 },
+      { dimension: "execution", minScore: 55 },
+      { dimension: "freedom", minScore: 50 },
     ],
   },
   "The Steady Optimiser": {
