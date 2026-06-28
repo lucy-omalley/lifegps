@@ -9,18 +9,24 @@ export function Footer() {
           <div className="text-center sm:text-left">
             <p className="text-sm font-medium">LifeGPS</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              Navigate your future with AI.
+              Discover Yourself. Design Your Future.
             </p>
           </div>
-          <div className="flex gap-6 text-sm text-muted-foreground">
+          <div className="flex flex-wrap justify-center gap-6 text-sm text-muted-foreground">
+            <Link href="/journey" className="hover:text-foreground">
+              Journey
+            </Link>
+            <Link href="/profile" className="hover:text-foreground">
+              Profile
+            </Link>
             <Link href="/assessment" className="hover:text-foreground">
-              Assessment
+              Personality Quiz
             </Link>
             <Link href="/dashboard" className="hover:text-foreground">
               Dashboard
             </Link>
             <Link href="/coach" className="hover:text-foreground">
-              Weekly Coach
+              Coach
             </Link>
           </div>
         </div>
@@ -28,7 +34,7 @@ export function Footer() {
         <p className="text-center text-sm text-muted-foreground">
           © {new Date().getFullYear()}{" "}
           <span className="font-medium text-foreground">RemoteGeek Hub</span>.
-          All rights reserved.
+          Readings are for entertainment and self-reflection only.
         </p>
       </div>
     </footer>

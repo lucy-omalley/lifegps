@@ -20,6 +20,7 @@ import {
   saveBlueprint,
   saveCompassSession,
 } from "@/lib/storage";
+import { markModuleComplete } from "@/lib/discovery/storage";
 import {
   assessmentPhaseAtom,
   compassAnswersMapAtom,
@@ -121,6 +122,7 @@ export function AssessmentForm() {
 
     setAssessment(assessmentData);
     saveAssessment(assessmentData);
+    markModuleComplete("quiz");
 
     setPhase("analysing");
     await delay(1800);

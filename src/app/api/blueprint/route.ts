@@ -3,20 +3,25 @@ import { getOpenAIClient } from "@/lib/openai/client";
 import {
   LIFEGPS_SYSTEM_PROMPT,
   BLUEPRINT_USER_PROMPT,
+  BLUEPRINT_REFINE_PROMPT,
 } from "@/lib/openai/prompts";
 import { formatDimensionScoresForDisplay } from "@/lib/compass/scoring";
+import { canGenerateFullBlueprint } from "@/lib/features";
 import { blueprintFromRow, blueprintToRow } from "@/lib/supabase/mappers";
 import { getAuthenticatedUser } from "@/lib/supabase/server";
 import type { CompassAssessment, LifeBlueprint } from "@/types";
+import type { DiscoveryProgress, UnifiedProfile } from "@/types/discovery";
 
 function generateMockBlueprint(
   assessment: CompassAssessment,
-  userId: string
+  userId: string,
+  unifiedProfile?: UnifiedProfile | null
 ): LifeBlueprint {
   const results = assessment.results!;
   const id = crypto.randomUUID();
   const firstOutcome =
     assessment.answers.find((a) => a.questionId === 50)?.selectedAnswer ??
+    unifiedProfile?.growthRecommendations[0] ??
     "More clarity";
 
   const showSideBusiness =
@@ -36,13 +41,17 @@ function generateMockBlueprint(
     results.financialFreedomReadiness.includes("Developing") ||
     results.financialFreedomReadiness.includes("Strong");
 
+  const unifiedNote = unifiedProfile
+    ? ` Your self-discovery profile (${unifiedProfile.completedModules.length} modules) reinforces themes around ${unifiedProfile.topStrengths.slice(0, 2).join(" and ")}.`
+    : "";
+
   return {
     id,
     userId,
     assessmentId: crypto.randomUUID(),
     createdAt: new Date().toISOString(),
     archetype: results.archetype,
-    archetypeSummary: `As ${results.archetype}, ${results.archetypeDescription} Your Compass profile shows strengths in ${results.topStrengths.join(" and ")}, with growth opportunities in ${results.topGrowthAreas.join(" and ")}.`,
+    archetypeSummary: `As ${results.archetype}, ${results.archetypeDescription} Your Compass profile shows strengths in ${results.topStrengths.join(" and ")}, with growth opportunities in ${results.topGrowthAreas.join(" and ")}.${unifiedNote}`,
     compassScoreOverview: formatDimensionScoresForDisplay(
       results.dimensionScores
     ),
@@ -106,6 +115,70 @@ function generateMockBlueprint(
   };
 }
 
+function generateMockBlueprintFromProfile(
+  userId: string,
+  unifiedProfile: UnifiedProfile
+): LifeBlueprint {
+  return {
+    id: crypto.randomUUID(),
+    userId,
+    assessmentId: crypto.randomUUID(),
+    createdAt: new Date().toISOString(),
+    archetype: "The Purpose Explorer",
+    archetypeSummary: unifiedProfile.unifiedSummary,
+    compassScoreOverview: `Self-discovery confidence score: ${unifiedProfile.blueprintConfidenceScore}/100. Modules completed: ${unifiedProfile.completedModules.join(", ")}.`,
+    futureSelfSummary: `In five years, you embody the strengths reflected in your self-discovery journey — particularly ${unifiedProfile.topStrengths[0]?.toLowerCase() ?? "personal growth"}.`,
+    currentStateAnalysis: `Your blind spots may include ${unifiedProfile.blindSpots.join(" and ").toLowerCase()}. Stress patterns suggest ${unifiedProfile.stressPattern[0]?.toLowerCase() ?? "awareness of energy management"}.`,
+    dreamLifeVision: unifiedProfile.careerDirection[0] ?? "A life aligned with your authentic strengths",
+    gapAnalysis: `Focus growth on ${unifiedProfile.growthRecommendations.join("; ")}.`,
+    fiveYearRoadmap: [
+      "Year 1: Build foundational habits and clarify direction",
+      "Year 2: Develop skills in priority growth areas",
+      "Year 3: Expand career and relationship alignment",
+      "Year 4: Scale what works and release what doesn't",
+      "Year 5: Live with intentional balance and purpose",
+    ],
+    twelveMonthPlan: unifiedProfile.growthRecommendations.slice(0, 4).length >= 4
+      ? unifiedProfile.growthRecommendations.slice(0, 4)
+      : [
+          "Q1: Establish core reflection and planning habits",
+          "Q2: Pursue one career or skill experiment",
+          "Q3: Strengthen relationships and communication",
+          "Q4: Review and refine your life direction",
+        ],
+    ninetyDayActionPlan: unifiedProfile.growthRecommendations,
+    sevenDayStarterPlan: [
+      "Days 1-2: Review your unified self-discovery profile",
+      "Days 3-4: Choose one strength to lean into this week",
+      "Days 5-7: Take one small action on a growth recommendation",
+    ],
+    dailyHabits: [
+      "5-minute morning intention setting",
+      "One focused block on a growth priority",
+      "Evening gratitude and reflection",
+    ],
+    weeklyCheckInQuestions: [
+      "What did I learn about myself this week?",
+      "What pattern do I want to change?",
+      "What is my one priority for next week?",
+    ],
+    weeklyPriorities: unifiedProfile.growthRecommendations.slice(0, 3),
+    recommendedFirstStep: unifiedProfile.growthRecommendations[0] ?? "Review your self-discovery profile and choose one action for today.",
+  };
+}
+
+function limitBlueprintForPreview(blueprint: LifeBlueprint): LifeBlueprint {
+  return {
+    ...blueprint,
+    fiveYearRoadmap: blueprint.fiveYearRoadmap.slice(0, 2),
+    twelveMonthPlan: blueprint.twelveMonthPlan.slice(0, 2),
+    ninetyDayActionPlan: blueprint.ninetyDayActionPlan.slice(0, 2),
+    sevenDayStarterPlan: blueprint.sevenDayStarterPlan.slice(0, 1),
+    dailyHabits: blueprint.dailyHabits.slice(0, 2),
+    archetypeSummary: blueprint.archetypeSummary.slice(0, 400) + "...",
+  };
+}
+
 export async function GET() {
   const { supabase, user } = await getAuthenticatedUser();
 
@@ -144,101 +217,121 @@ export async function POST(request: Request) {
     const { supabase, user } = await getAuthenticatedUser();
 
     const body = await request.json();
-    const { assessment, userId: bodyUserId } = body as {
-      assessment: CompassAssessment;
+    const {
+      assessment,
+      unifiedProfile,
+      feedback,
+      userId: bodyUserId,
+      progress,
+    } = body as {
+      assessment?: CompassAssessment;
+      unifiedProfile?: UnifiedProfile;
+      feedback?: string;
       userId?: string;
+      progress?: DiscoveryProgress;
     };
-
-    if (!assessment) {
-      return NextResponse.json(
-        { error: "Assessment data is required" },
-        { status: 400 }
-      );
-    }
-
-    if (!assessment.results || assessment.answers.length < 50) {
-      return NextResponse.json(
-        { error: "Complete Compass assessment with results is required" },
-        { status: 400 }
-      );
-    }
 
     const userId = user?.id ?? bodyUserId;
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const hasAssessment =
+      assessment?.results && assessment.answers.length >= 50;
+    const hasProfile = Boolean(unifiedProfile);
+
+    if (!hasAssessment && !hasProfile) {
+      return NextResponse.json(
+        { error: "Complete self-discovery modules or the personality quiz first" },
+        { status: 400 }
+      );
+    }
+
+    const isFullBlueprint = canGenerateFullBlueprint(progress);
+    const isPreview = !isFullBlueprint;
+
     let blueprintData: Omit<
       LifeBlueprint,
       "id" | "userId" | "assessmentId" | "createdAt" | "archetype"
     >;
 
-    if (process.env.OPENAI_API_KEY) {
+    if (process.env.OPENAI_API_KEY && hasAssessment) {
       const openai = getOpenAIClient();
       const completion = await openai.chat.completions.create({
         model: "gpt-4o-mini",
         messages: [
           { role: "system", content: LIFEGPS_SYSTEM_PROMPT },
-          { role: "user", content: BLUEPRINT_USER_PROMPT(assessment) },
+          {
+            role: "user",
+            content: BLUEPRINT_USER_PROMPT(
+              assessment!,
+              unifiedProfile,
+              feedback,
+              isPreview
+            ),
+          },
         ],
         temperature: 0.7,
         response_format: { type: "json_object" },
       });
 
       const content = completion.choices[0]?.message?.content;
-      if (!content) {
-        throw new Error("No response from OpenAI");
-      }
-
+      if (!content) throw new Error("No response from OpenAI");
       blueprintData = JSON.parse(content);
+    } else if (hasAssessment) {
+      const mock = generateMockBlueprint(assessment!, userId, unifiedProfile);
+      const {
+        id: _id,
+        userId: _uid,
+        assessmentId: _aid,
+        createdAt: _ca,
+        archetype: _arch,
+        ...rest
+      } = mock;
+      blueprintData = rest;
     } else {
-      const mock = generateMockBlueprint(assessment, userId);
-      blueprintData = {
-        archetypeSummary: mock.archetypeSummary,
-        compassScoreOverview: mock.compassScoreOverview,
-        futureSelfSummary: mock.futureSelfSummary,
-        currentStateAnalysis: mock.currentStateAnalysis,
-        dreamLifeVision: mock.dreamLifeVision,
-        gapAnalysis: mock.gapAnalysis,
-        fiveYearRoadmap: mock.fiveYearRoadmap,
-        twelveMonthPlan: mock.twelveMonthPlan,
-        ninetyDayActionPlan: mock.ninetyDayActionPlan,
-        sevenDayStarterPlan: mock.sevenDayStarterPlan,
-        dailyHabits: mock.dailyHabits,
-        weeklyCheckInQuestions: mock.weeklyCheckInQuestions,
-        weeklyPriorities: mock.weeklyPriorities,
-        sideBusinessDirection: mock.sideBusinessDirection,
-        communicationGrowthPlan: mock.communicationGrowthPlan,
-        burnoutRecoveryActions: mock.burnoutRecoveryActions,
-        financialFreedomNotes: mock.financialFreedomNotes,
-        recommendedFirstStep: mock.recommendedFirstStep,
-      };
+      const mock = generateMockBlueprintFromProfile(userId, unifiedProfile!);
+      const {
+        id: _id,
+        userId: _uid,
+        assessmentId: _aid,
+        createdAt: _ca,
+        archetype: _arch,
+        ...rest
+      } = mock;
+      blueprintData = rest;
     }
 
     const assessmentId = crypto.randomUUID();
-    const blueprint: LifeBlueprint = {
+    let blueprint: LifeBlueprint = {
       id: crypto.randomUUID(),
       userId,
       assessmentId,
       createdAt: new Date().toISOString(),
-      archetype: assessment.results.archetype,
+      archetype:
+        assessment?.results?.archetype ?? ("The Purpose Explorer" as const),
       ...blueprintData,
     };
 
-    if (supabase && user) {
-      const { error: assessmentError } = await supabase
-        .from("assessments")
-        .insert({
-          id: assessmentId,
-          user_id: user.id,
-          data: assessment,
-          is_complete: true,
-          completed_at: assessment.completedAt ?? new Date().toISOString(),
-        });
+    if (isPreview) {
+      blueprint = limitBlueprintForPreview(blueprint);
+    }
 
-      if (assessmentError) {
-        console.error("Assessment insert error:", assessmentError);
-        throw new Error("Failed to save assessment");
+    if (supabase && user) {
+      if (hasAssessment) {
+        const { error: assessmentError } = await supabase
+          .from("assessments")
+          .insert({
+            id: assessmentId,
+            user_id: user.id,
+            data: assessment,
+            is_complete: true,
+            completed_at: assessment!.completedAt ?? new Date().toISOString(),
+          });
+
+        if (assessmentError) {
+          console.error("Assessment insert error:", assessmentError);
+        }
       }
 
       const row = blueprintToRow(blueprint, assessmentId);
@@ -254,11 +347,108 @@ export async function POST(request: Request) {
       await supabase.from("compass_sessions").delete().eq("user_id", user.id);
     }
 
-    return NextResponse.json({ blueprint, persisted: Boolean(supabase && user) });
+    return NextResponse.json({
+      blueprint,
+      persisted: Boolean(supabase && user),
+      isPreview,
+    });
   } catch (error) {
     console.error("Blueprint generation error:", error);
     return NextResponse.json(
       { error: "Failed to generate life blueprint" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PATCH(request: Request) {
+  try {
+    const { supabase, user } = await getAuthenticatedUser();
+    const body = await request.json();
+    const { blueprint, feedback, progress } = body as {
+      blueprint: LifeBlueprint;
+      feedback: string;
+      progress?: DiscoveryProgress;
+    };
+
+    if (!blueprint || !feedback?.trim()) {
+      return NextResponse.json(
+        { error: "Blueprint and feedback are required" },
+        { status: 400 }
+      );
+    }
+
+    if (!canGenerateFullBlueprint(progress)) {
+      return NextResponse.json(
+        { error: "Blueprint refinement is a premium feature" },
+        { status: 403 }
+      );
+    }
+
+    let refinedData: Omit<
+      LifeBlueprint,
+      "id" | "userId" | "assessmentId" | "createdAt" | "archetype"
+    >;
+
+    if (process.env.OPENAI_API_KEY) {
+      const openai = getOpenAIClient();
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          { role: "system", content: LIFEGPS_SYSTEM_PROMPT },
+          {
+            role: "user",
+            content: BLUEPRINT_REFINE_PROMPT(blueprint, feedback),
+          },
+        ],
+        temperature: 0.7,
+        response_format: { type: "json_object" },
+      });
+
+      const content = completion.choices[0]?.message?.content;
+      if (!content) throw new Error("No response from OpenAI");
+      refinedData = JSON.parse(content);
+    } else {
+      refinedData = {
+        archetypeSummary: blueprint.archetypeSummary + ` (Refined based on: ${feedback})`,
+        compassScoreOverview: blueprint.compassScoreOverview,
+        futureSelfSummary: blueprint.futureSelfSummary,
+        currentStateAnalysis: blueprint.currentStateAnalysis,
+        dreamLifeVision: blueprint.dreamLifeVision,
+        gapAnalysis: blueprint.gapAnalysis,
+        fiveYearRoadmap: blueprint.fiveYearRoadmap,
+        twelveMonthPlan: blueprint.twelveMonthPlan,
+        ninetyDayActionPlan: blueprint.ninetyDayActionPlan,
+        sevenDayStarterPlan: blueprint.sevenDayStarterPlan,
+        dailyHabits: blueprint.dailyHabits,
+        weeklyCheckInQuestions: blueprint.weeklyCheckInQuestions,
+        weeklyPriorities: blueprint.weeklyPriorities,
+        sideBusinessDirection: blueprint.sideBusinessDirection,
+        communicationGrowthPlan: blueprint.communicationGrowthPlan,
+        burnoutRecoveryActions: blueprint.burnoutRecoveryActions,
+        financialFreedomNotes: blueprint.financialFreedomNotes,
+        recommendedFirstStep: blueprint.recommendedFirstStep,
+      };
+    }
+
+    const refined: LifeBlueprint = {
+      ...blueprint,
+      id: crypto.randomUUID(),
+      createdAt: new Date().toISOString(),
+      archetype: blueprint.archetype,
+      ...refinedData,
+    };
+
+    if (supabase && user) {
+      const row = blueprintToRow(refined, blueprint.assessmentId);
+      await supabase.from("life_blueprints").insert(row);
+    }
+
+    return NextResponse.json({ blueprint: refined });
+  } catch (error) {
+    console.error("Blueprint refine error:", error);
+    return NextResponse.json(
+      { error: "Failed to refine blueprint" },
       { status: 500 }
     );
   }
