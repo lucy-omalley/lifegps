@@ -60,7 +60,7 @@ Return ONLY valid JSON with this exact structure (no markdown, no code fences):
 
 {
   "archetypeSummary": "2-3 paragraphs about their LifeGPS Archetype and what it means for their journey",
-  "compassScoreOverview": "Summary of their 8 dimension scores, top strengths, and growth areas",
+  "compassScoreOverview": "Summary of their 6 dimension scores, top strengths, and growth areas",
   "futureSelfSummary": "A vivid 2-3 paragraph description of who they become in 5 years",
   "currentStateAnalysis": "Honest but compassionate current life diagnosis based on their answers",
   "dreamLifeVision": "Clear dream life direction aligned with their archetype and motivations",
@@ -88,12 +88,19 @@ Compass Results:
 - Execution Style: ${results?.executionStyle ?? ""}
 - Financial Freedom Readiness: ${results?.financialFreedomReadiness ?? ""}
 - Side Business Readiness: ${results?.sideBusinessReadiness ?? ""}
+- Adaptive Signals (for follow-up coaching): ${JSON.stringify(results?.adaptiveSignals ?? {})}
+- Optional User Note: ${results?.optionalReflection ?? "None"}
 
 Dimension Scores (out of 100):
 ${dimensionScoresText}
 
 Personality Quiz Answers:
 ${JSON.stringify(assessment.answers, null, 2)}
+
+COACHING FOLLOW-UP HINTS based on adaptive signals:
+- If sideBusiness: later ask "What type of business would excite you most?"
+- If earlyRetirement: later ask "What is your biggest obstacle to financial freedom?"
+- If careerChange: later ask "What kind of work would make you excited to wake up?"
 `;
 };
 

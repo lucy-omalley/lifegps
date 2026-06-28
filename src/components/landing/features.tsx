@@ -18,7 +18,7 @@ const features = [
     icon: Brain,
     title: "LifeGPS Compass™ Assessment",
     description:
-      "An interactive 8-minute personality-style questionnaire across 8 life dimensions.",
+      "A 3–5 minute discovery journey across 7 life areas — conversational, visual, one question at a time.",
   },
   {
     icon: MapPinned,

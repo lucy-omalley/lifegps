@@ -26,6 +26,7 @@ import {
 import { BlueprintFeedback } from "@/components/blueprint/blueprint-feedback";
 import { Disclaimer } from "@/components/shared/disclaimer";
 import { Badge } from "@/components/ui/badge";
+import { ClientDate } from "@/components/ui/client-date";
 
 function TextCard({
   title,
@@ -124,9 +125,10 @@ export function BlueprintDisplay({
             <Compass className="mr-1 h-3 w-3" />
             {blueprint.archetype}
           </Badge>
-          <span className="text-sm text-muted-foreground">
-            Generated {new Date(blueprint.createdAt).toLocaleDateString()}
-          </span>
+          <ClientDate
+            iso={blueprint.createdAt}
+            className="text-sm text-muted-foreground"
+          />
         </div>
       </div>
 

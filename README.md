@@ -7,10 +7,11 @@ LifeGPS is an AI Life Architect MVP by [RemoteGeek Hub](https://remotegeekhub.co
 ## Features
 
 - **Landing Page** — Premium marketing site with hero, problem/solution, features, and pricing
-- **LifeGPS Compass™ Assessment** — Interactive 50-question personality-style onboarding (~8 minutes)
+- **LifeGPS Compass™ Assessment** — Short discovery journey onboarding (20 questions, ~3–5 minutes)
 - **AI Life Blueprint** — OpenAI-powered personalised roadmap with archetype, compass scores, and action plans
 - **Dashboard** — Track dream life summary, goals, priorities, and habits
 - **Weekly AI Coach** — Chat-style check-in with supportive coaching responses
+- **Founder Agent** — Internal dashboard at `/founder-agent` for product validation
 
 ## Tech Stack
 
@@ -61,7 +62,7 @@ Open [http://localhost:3000](http://localhost:3000).
 ### 4. Try the flow
 
 1. Visit the landing page and click **Create My Life Blueprint**
-2. Complete the LifeGPS Compass™ Assessment (50 questions, ~8 minutes)
+2. Complete the LifeGPS Compass™ discovery journey (20 questions, ~3–5 minutes)
 3. View your LifeGPS Archetype reveal and AI-generated Life Blueprint
 4. Check your Dashboard for goals and habits
 5. Use Weekly Coach for progress check-ins
@@ -70,31 +71,36 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ### How it works
 
-1. **Intro screen** — Sets expectations (~8 minutes, 50 questions)
-2. **One question per screen** — Multiple choice, scale (1–10), and scenario-based questions across 8 dimensions
-3. **Progress saved locally** — Answers persist in `localStorage` during the session
-4. **Scoring** — Client-side dimension scores, strengths, growth areas, burnout risk, and archetype assignment
-5. **Reveal sequence** — Analysing → Archetype → Blueprint generation
-6. **Life Blueprint** — AI generates a personalised roadmap using all answers, scores, and archetype
+1. **Intro screen** — Sets expectations (~3–5 minutes, 7 sections)
+2. **One question per screen** — Conversational multiple choice, multi-select, and sliders across 7 sections
+3. **Progress saved locally** — Answers persist in `localStorage` during the session (and sync to Supabase when configured)
+4. **Scoring** — Client-side inference from fewer answers: 6 compass scores, strengths, growth areas, burnout risk, readiness signals, and archetype
+5. **Reveal sequence** — Animated results → Archetype → Blueprint generation
+6. **Life Blueprint** — AI generates a personalised roadmap using answers, scores, adaptive signals, and archetype
 
-### 8 Compass dimensions
+### 7 discovery sections
 
-| Dimension | Questions |
-|-----------|-----------|
-| Purpose & Direction | 1–6 |
-| Career & Work Energy | 7–12 |
-| Skills & Growth | 13–18 |
-| Communication & Confidence | 19–24 |
-| Side Business & Creativity | 25–30 |
-| Money & Freedom | 31–36 |
-| Energy, Burnout & Lifestyle | 37–42 |
-| Execution & Habits | 43–50 |
+| Section | Questions |
+|---------|-----------|
+| Your Direction | 1–3 |
+| How You Naturally Work | 4–6 |
+| Career | 7–9 |
+| Lifestyle & Energy | 10–12 |
+| Money & Freedom | 13–15 |
+| Growth & Confidence | 16–18 |
+| Final Reflection | 19–20 (+ optional note) |
+
+### 6 Compass dimensions
+
+Purpose · Career · Energy · Communication · Freedom · Execution
 
 ### How scoring works
 
-- **Scale questions (1–10):** Numeric value × 10 = score contribution (Q24 is inverted — higher limitation = lower score)
+- **Scale questions (1–10):** Numeric value × 10 = score contribution
 - **Choice questions:** Each option has a semantic score (0–100) defined in the question data
-- **Dimension score:** Average of all question scores in that dimension, normalised to 0–100
+- **Cross-inference:** Fewer answers infer more — e.g. burnout signals boost energy/career risk scoring
+- **Dimension score:** Weighted average of answers mapped to each of 6 compass dimensions
+- **Adaptive signals:** Side business, early retirement, career change, and burnout flags stored for coach follow-up
 - **Top strengths / growth areas:** Highest and lowest 2 dimension scores
 - **Burnout risk:** Derived from energy, career, and burnout-related answers (Low / Medium / High)
 - **Archetype:** Assigned from weighted rules based on dimension scores and key answers
@@ -104,6 +110,7 @@ Open [http://localhost:3000](http://localhost:3000).
 | What | File |
 |------|------|
 | Questions (text, options, scores) | `src/lib/compass/questions.ts` |
+| Section structure (7 steps) | `src/lib/compass/sections.ts` |
 | Dimension labels | `src/lib/compass/dimensions.ts` |
 | Scoring logic | `src/lib/compass/scoring.ts` |
 | Archetypes & descriptions | `src/lib/compass/archetypes.ts` |
@@ -141,6 +148,57 @@ Without Supabase env vars, the app falls back to **localStorage only** (same as 
 
 > **Future:** Replace anonymous auth with email/OAuth in `src/lib/auth.ts` when ready for production accounts.
 
+## Founder Agent (Internal)
+
+Internal dashboard at **`/founder-agent`** for validating and growing LifeGPS.
+
+### How it works
+
+1. **Admin gate** — Enter email matching `ADMIN_EMAIL` (local dev works without it set)
+2. **Metrics dashboard** — Aggregated, anonymised stats from Supabase or mock data
+3. **Founder Agent chat** — AI advisor with full product context injected per message
+4. **Weekly Founder Plan** — One-click AI plan for product, marketing, pricing, and retention
+5. **Feedback analysis** — `analyseFeedback()` utility + Feedback Analyst Agent
+
+### Required environment variables
+
+| Variable | Purpose |
+|----------|---------|
+| `ADMIN_EMAIL` | Founder login email (production) |
+| `SUPABASE_SERVICE_ROLE_KEY` | Live metrics aggregation (server-only) |
+| `OPENAI_API_KEY` | Founder chat + weekly plan AI (optional — mock fallback) |
+
+### Where agent prompts live
+
+| Agent | File |
+|-------|------|
+| LifeGPS Coach (blueprint, coach) | `src/lib/agents/lifegpsCoachAgent.ts` + `src/lib/openai/prompts.ts` |
+| Founder Agent | `src/lib/agents/founderAgent.ts` |
+| Feedback Analyst | `src/lib/agents/feedbackAnalystAgent.ts` |
+
+### Connect Supabase data
+
+1. Run `supabase/schema.sql` and `supabase/migrations/003_founder_agent_feedback.sql`
+2. Set `SUPABASE_SERVICE_ROLE_KEY` for aggregated founder metrics
+3. Metrics pull from: `assessments`, `life_blueprints`, `blueprint_feedback`, `weekly_checkins`
+
+Without Supabase, the dashboard uses **mock data** (clearly labelled).
+
+### Test locally
+
+```bash
+# .env.local
+ADMIN_EMAIL=you@example.com
+npm run dev
+# Visit http://localhost:3000/founder-agent
+```
+
+### Data safety
+
+- Founder dashboard shows **aggregates only** — no full names or individual PII
+- Reflections are anonymised before display
+- **TODO:** Replace email gate with role-based access control before production
+
 ## Deploy to Vercel
 
 1. Push to GitHub
@@ -162,20 +220,27 @@ src/
 │   ├── blueprint/            # AI blueprint results
 │   ├── dashboard/            # Progress dashboard
 │   ├── coach/                # Weekly AI coach
+│   ├── founder-agent/        # Internal founder dashboard
 │   └── api/
-│       ├── blueprint/        # OpenAI blueprint generation
-│       └── coach/            # OpenAI coaching
+│       ├── assessment/       # Compass session + completed assessment
+│       ├── blueprint/        # Life Blueprint generation
+│       ├── coach/            # Weekly coaching
+│       └── founder-agent/    # Founder metrics, chat, weekly plan
 ├── components/
-│   ├── landing/              # Landing page sections
-│   ├── assessment/           # Compass intro, questions, reveal
-│   ├── blueprint/            # Blueprint display
-│   ├── dashboard/            # Dashboard view
-│   ├── coach/                # Coach chat
-│   └── layout/               # Header & footer
+│   ├── landing/
+│   ├── assessment/
+│   ├── blueprint/
+│   ├── dashboard/
+│   ├── coach/
+│   ├── founder/              # Founder dashboard, chat, gate
+│   └── layout/
 ├── lib/
-│   ├── compass/              # Questions, scoring, archetypes
-│   ├── data/sync.ts          # Client ↔ Supabase sync helpers
-│   ├── auth.ts               # Supabase anonymous auth (+ localStorage fallback)
+│   ├── agents/               # Coach, Founder, Feedback Analyst agents
+│   ├── compass/
+│   ├── founder/              # Metrics + analyseFeedback()
+│   ├── data/sync.ts
+│   ├── auth.ts
+│   ├── admin.ts              # ADMIN_EMAIL access check
 │   ├── storage.ts            # localStorage helpers
 │   ├── openai/               # OpenAI client & prompts
 │   └── supabase/             # Supabase clients
@@ -187,7 +252,8 @@ src/
 
 ## TODO
 
-- [ ] Replace mock auth with Supabase Auth
+- [ ] Replace founder email gate with role-based access control
+- [ ] Add user-facing blueprint rating UI (feeds founder metrics)
 - [ ] Integrate Stripe for Premium (€9/month)
 - [ ] Persist habits with completion tracking in Supabase
 - [ ] Add email notifications for weekly check-in reminders

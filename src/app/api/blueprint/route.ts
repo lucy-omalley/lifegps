@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { getOpenAIClient } from "@/lib/openai/client";
 import {
   LIFEGPS_SYSTEM_PROMPT,
   BLUEPRINT_USER_PROMPT,
@@ -9,6 +8,7 @@ import { formatDimensionScoresForDisplay } from "@/lib/compass/scoring";
 import { canGenerateFullBlueprint } from "@/lib/features";
 import { blueprintFromRow, blueprintToRow } from "@/lib/supabase/mappers";
 import { getAuthenticatedUser } from "@/lib/supabase/server";
+import { hasRequiredAnswers } from "@/lib/compass/scoring";
 import type { CompassAssessment, LifeBlueprint } from "@/types";
 import type { DiscoveryProgress, UnifiedProfile } from "@/types/discovery";
 
@@ -333,18 +333,6 @@ export async function POST(request: Request) {
           console.error("Assessment insert error:", assessmentError);
         }
       }
-
-      const row = blueprintToRow(blueprint, assessmentId);
-      const { error: blueprintError } = await supabase
-        .from("life_blueprints")
-        .insert(row);
-
-      if (blueprintError) {
-        console.error("Blueprint insert error:", blueprintError);
-        throw new Error("Failed to save blueprint");
-      }
-
-      await supabase.from("compass_sessions").delete().eq("user_id", user.id);
     }
 
     return NextResponse.json({

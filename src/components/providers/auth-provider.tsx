@@ -1,22 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { ensureAuthenticatedUser } from "@/lib/auth";
 
+/** Runs anonymous Supabase sign-in after mount — does not block render (avoids hydration mismatch). */
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [ready, setReady] = useState(false);
-
   useEffect(() => {
-    ensureAuthenticatedUser().finally(() => setReady(true));
+    void ensureAuthenticatedUser();
   }, []);
-
-  if (!ready) {
-    return (
-      <div className="flex min-h-full flex-1 items-center justify-center">
-        <p className="text-sm text-muted-foreground">Loading...</p>
-      </div>
-    );
-  }
 
   return <>{children}</>;
 }

@@ -3,11 +3,18 @@
 import { useAtom } from "jotai";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import { ArrowLeft, ArrowRight } from "lucide-react";
+import { ArrowLeft, ArrowRight, Sparkles } from "lucide-react";
 import { CompassIntro } from "./compass-intro";
 import { CompassQuestionView } from "./compass-question";
 import { CompassReveal } from "./compass-reveal";
-import { COMPASS_QUESTIONS, TOTAL_QUESTIONS } from "@/lib/compass/questions";
+import {
+  COMPASS_QUESTIONS,
+  TOTAL_QUESTIONS,
+} from "@/lib/compass/questions";
+import {
+  getSectionForQuestion,
+  TOTAL_SECTIONS,
+} from "@/lib/compass/sections";
 import { buildAnswer, computeCompassResults } from "@/lib/compass/scoring";
 import { ensureAuthenticatedUser } from "@/lib/auth";
 import {
@@ -42,14 +49,18 @@ export function AssessmentForm() {
 
   const question = COMPASS_QUESTIONS[questionIndex];
   const currentAnswer = question ? answersMap[question.id] : undefined;
-  const progress =
-    phase === "questions"
-      ? ((questionIndex + 1) / TOTAL_QUESTIONS) * 100
+  const section = question ? getSectionForQuestion(question.id) : null;
+  const sectionStep = section?.id ?? 1;
+  const sectionProgress =
+    phase === "questions" && section
+      ? (sectionStep / TOTAL_SECTIONS) * 100
       : phase === "intro"
         ? 0
         : 100;
 
-  const hasAnswer = Boolean(currentAnswer);
+  const isOptional = question?.type === "optionalText";
+  const hasAnswer = isOptional || Boolean(currentAnswer);
+  const isLastScreen = questionIndex === COMPASS_QUESTIONS.length - 1;
 
   const persistSession = useCallback(
     (map: Record<number, CompassAnswer>, qIndex: number, currentPhase: string) => {
@@ -90,7 +101,7 @@ export function AssessmentForm() {
   };
 
   const handleNext = () => {
-    if (questionIndex < TOTAL_QUESTIONS - 1) {
+    if (!isLastScreen) {
       setQuestionIndex(questionIndex + 1);
       window.scrollTo({ top: 0, behavior: "smooth" });
     } else {
@@ -118,6 +129,7 @@ export function AssessmentForm() {
       answers,
       results,
       completedAt: results.completedAt,
+      version: "compass-v2",
     };
 
     setAssessment(assessmentData);
@@ -125,23 +137,29 @@ export function AssessmentForm() {
     markModuleComplete("quiz");
 
     setPhase("analysing");
-    await delay(1800);
+    await delay(1400);
 
     setPhase("creating-archetype");
-    await delay(1800);
+    await delay(1400);
 
     setPhase("building-blueprint");
 
     try {
-      await ensureAuthenticatedUser();
+      const authUser = await ensureAuthenticatedUser();
       const response = await fetch("/api/blueprint", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ assessment: assessmentData }),
+        body: JSON.stringify({
+          assessment: assessmentData,
+          userId: authUser.id,
+        }),
       });
 
       if (!response.ok) {
-        throw new Error("Failed to generate blueprint");
+        const payload = (await response.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+        throw new Error(payload?.error ?? "Failed to generate blueprint");
       }
 
       const { blueprint } = await response.json();
@@ -191,46 +209,67 @@ export function AssessmentForm() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl min-h-[60vh]">
-      <div className="mb-6">
-        <div className="mb-2 flex items-center justify-between text-sm">
+    <div className="mx-auto max-w-2xl min-h-[60vh] px-1">
+      <div className="mb-8">
+        <div className="mb-3 flex items-center justify-between text-sm">
           <span className="font-medium text-teal-700 dark:text-teal-300">
-            LifeGPS Compass™
+            {section?.title ?? "LifeGPS Compass™"}
           </span>
           <span className="text-muted-foreground">
-            Question {questionIndex + 1} of {TOTAL_QUESTIONS}
+            Step {sectionStep} of {TOTAL_SECTIONS}
           </span>
         </div>
-        <Progress value={progress} className="h-2" />
+        <Progress value={sectionProgress} className="h-1.5" />
       </div>
 
-      <div className="rounded-2xl border border-border/40 bg-card/80 p-6 shadow-lg backdrop-blur-sm sm:p-8">
+      <div
+        key={question?.id}
+        className="rounded-3xl border border-border/40 bg-card/90 p-6 shadow-xl shadow-teal-500/5 backdrop-blur-sm sm:p-10"
+      >
         {question && (
           <CompassQuestionView
             question={question}
-            questionIndex={questionIndex}
-            totalQuestions={TOTAL_QUESTIONS}
             currentAnswer={currentAnswer}
             onAnswer={handleAnswer}
           />
         )}
       </div>
 
-      <div className="mt-6 flex items-center justify-between gap-4">
-        <Button variant="outline" onClick={handleBack}>
+      <div className="mt-8 flex items-center justify-between gap-4">
+        <Button
+          variant="ghost"
+          onClick={handleBack}
+          className="text-muted-foreground"
+        >
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back
         </Button>
 
         <Button
           onClick={handleNext}
-          disabled={!hasAnswer}
-          className="bg-gradient-to-r from-teal-500 to-indigo-600 text-white hover:from-teal-600 hover:to-indigo-700 disabled:opacity-50"
+          disabled={!hasAnswer && !isOptional}
+          size="lg"
+          className="min-w-[140px] bg-gradient-to-r from-teal-500 to-indigo-600 text-white hover:from-teal-600 hover:to-indigo-700 disabled:opacity-50"
         >
-          {questionIndex === TOTAL_QUESTIONS - 1 ? "Complete Assessment" : "Next"}
-          <ArrowRight className="ml-2 h-4 w-4" />
+          {isLastScreen ? (
+            <>
+              <Sparkles className="mr-2 h-4 w-4" />
+              See My Results
+            </>
+          ) : (
+            <>
+              Continue
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </>
+          )}
         </Button>
       </div>
+
+      {!isOptional && (
+        <p className="mt-4 text-center text-xs text-muted-foreground">
+          {TOTAL_QUESTIONS} quick questions · about 3–5 minutes
+        </p>
+      )}
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useSetAtom } from "jotai";
 import { Provider } from "jotai";
 import { AssessmentForm } from "@/components/assessment/assessment-form";
+import { COMPASS_QUESTIONS } from "@/lib/compass/questions";
 import {
   loadCompassSessionFromDatabase,
 } from "@/lib/data/sync";
@@ -27,6 +28,17 @@ function SessionHydrator({ children }: { children: React.ReactNode }) {
       const session = fromDb ?? local;
 
       if (!session || session.answers.length === 0) return;
+
+      const maxQuestionId = Math.max(
+        ...session.answers.map((a) => a.questionId),
+        0
+      );
+      if (
+        maxQuestionId > 21 ||
+        session.currentQuestion >= COMPASS_QUESTIONS.length
+      ) {
+        return;
+      }
 
       const map = session.answers.reduce(
         (acc, answer) => {

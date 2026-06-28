@@ -4,6 +4,7 @@ import type { AssessmentPhase, CompassAnswer, CompassAssessment } from "@/types"
 export const defaultCompassAssessment: CompassAssessment = {
   answers: [],
   results: null,
+  version: "compass-v2",
 };
 
 export const compassAssessmentAtom = atom<CompassAssessment>(defaultCompassAssessment);
