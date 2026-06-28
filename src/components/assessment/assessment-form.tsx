@@ -16,7 +16,7 @@ import {
   TOTAL_SECTIONS,
 } from "@/lib/compass/sections";
 import { buildAnswer, computeCompassResults } from "@/lib/compass/scoring";
-import { ensureAuthenticatedUserLegacy } from "@/lib/auth";
+import { ensureAuthenticatedUser, getMockUser } from "@/lib/auth";
 import {
   clearCompassSessionFromDatabase,
   syncCompassSessionToDatabase,
@@ -145,13 +145,19 @@ export function AssessmentForm() {
     setPhase("building-blueprint");
 
     try {
-      const authUser = await ensureAuthenticatedUserLegacy();
+      const authResult = await ensureAuthenticatedUser();
+      const userId =
+        authResult.status === "unauthenticated"
+          ? getMockUser().id
+          : authResult.user.id;
+
       const response = await fetch("/api/blueprint", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({
           assessment: assessmentData,
-          userId: authUser.id,
+          userId,
         }),
       });
 
@@ -168,8 +174,12 @@ export function AssessmentForm() {
       void clearCompassSessionFromDatabase();
       setBlueprintReady(true);
       setPhase("archetype-reveal");
-    } catch {
-      setError("Something went wrong generating your blueprint. Please try again.");
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Something went wrong generating your blueprint. Please try again.";
+      setError(message);
       setPhase("archetype-reveal");
     }
   };
