@@ -30,7 +30,10 @@ export default function BlueprintPage() {
               <p className="text-muted-foreground">Loading your blueprint...</p>
             </div>
           ) : blueprint ? (
-            <BlueprintDisplay blueprint={blueprint} />
+            <BlueprintDisplay
+              blueprint={blueprint}
+              onBlueprintUpdate={setBlueprint}
+            />
           ) : (
             <div className="mx-auto max-w-lg text-center">
               <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-500/20 to-indigo-500/20">
@@ -38,14 +41,14 @@ export default function BlueprintPage() {
               </div>
               <h1 className="text-2xl font-bold">No Blueprint Found</h1>
               <p className="mt-2 text-muted-foreground">
-                Complete the Compass assessment to generate your personalized Life
-                Blueprint.
+                Complete your self-discovery journey and generate your LifeGPS
+                Blueprint from your unified profile.
               </p>
               <ButtonLink
-                href="/assessment"
+                href="/journey"
                 className="mt-6 bg-gradient-to-r from-teal-500 to-indigo-600 text-white"
               >
-                Start Compass Assessment
+                Start Self-Discovery Journey
               </ButtonLink>
             </div>
           )}

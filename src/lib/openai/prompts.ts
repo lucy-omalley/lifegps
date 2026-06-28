@@ -1,24 +1,61 @@
-import type { CompassAssessment } from "@/types";
+import type { CompassAssessment, LifeBlueprint } from "@/types";
+import type { UnifiedProfile } from "@/types/discovery";
 import { formatDimensionScoresForDisplay } from "@/lib/compass/scoring";
 
-export const LIFEGPS_SYSTEM_PROMPT = `You are LifeGPS, an AI Life Architect. Your role is to help professionals turn their dream life into a practical roadmap using their LifeGPS Compass™ Assessment results.
+export const LIFEGPS_SYSTEM_PROMPT = `You are an AI self-discovery and life coaching assistant for LifeGPS. You combine symbolic self-reflection inputs such as palm reading, face reading, numerology, tarot, and personality questionnaire results into a practical, encouraging personal growth profile and life blueprint.
 
-Be supportive, realistic, structured, and action-oriented.
+You must not claim to predict the future. You must not provide medical, legal, financial, or psychological advice. Your goal is to help the user reflect, understand patterns, and design realistic next steps.
+
+Be warm, encouraging, reflective, practical, non-deterministic, and action-oriented.
 
 IMPORTANT SAFETY INSTRUCTION:
 Do not provide regulated financial, legal, medical, or mental health advice. Use general educational and coaching language only. Encourage users to seek qualified professional advice where appropriate.
 
-Focus on clarity, habits, career growth, side business planning, communication improvement, burnout recovery, and life design. Personalise every section based on the user's archetype, dimension scores, and specific questionnaire answers.`;
+Focus on clarity, habits, career growth, communication improvement, burnout recovery, and life design. Personalise every section based on the user's unified self-discovery profile, archetype, dimension scores, and specific answers.`;
 
-export const BLUEPRINT_USER_PROMPT = (assessment: CompassAssessment) => {
+export const BLUEPRINT_USER_PROMPT = (
+  assessment: CompassAssessment,
+  unifiedProfile?: UnifiedProfile | null,
+  feedback?: string,
+  isPreview = false
+) => {
   const results = assessment.results;
   const dimensionScoresText = results
     ? formatDimensionScoresForDisplay(results.dimensionScores)
     : "Not calculated";
 
-  return `
-Based on the LifeGPS Compass™ Assessment below, generate a comprehensive personalised Life Blueprint.
+  const unifiedSection = unifiedProfile
+    ? `
+Unified Self-Discovery Profile:
+- Summary: ${unifiedProfile.unifiedSummary}
+- Top Strengths: ${unifiedProfile.topStrengths.join(", ")}
+- Blind Spots: ${unifiedProfile.blindSpots.join(", ")}
+- Career Direction: ${unifiedProfile.careerDirection.join(", ")}
+- Relationship Style: ${unifiedProfile.relationshipStyle.join(", ")}
+- Money Style: ${unifiedProfile.moneyStyle.join(", ")}
+- Growth Recommendations: ${unifiedProfile.growthRecommendations.join(", ")}
+- Stress Patterns: ${unifiedProfile.stressPattern.join(", ")}
+- Blueprint Confidence Score: ${unifiedProfile.blueprintConfidenceScore}
+- Completed Modules: ${unifiedProfile.completedModules.join(", ")}
+`
+    : "";
 
+  const feedbackSection = feedback
+    ? `
+User Feedback on Previous Blueprint (incorporate this into the regenerated plan):
+${feedback}
+`
+    : "";
+
+  const previewNote = isPreview
+    ? "\nNOTE: This is a LIMITED PREVIEW for a free user. Keep sections concise (1-2 items per list). Mark this as a preview-quality plan.\n"
+    : "";
+
+  return `
+Based on the LifeGPS self-discovery inputs below, generate a comprehensive personalised Life Blueprint.
+${previewNote}
+${unifiedSection}
+${feedbackSection}
 Return ONLY valid JSON with this exact structure (no markdown, no code fences):
 
 {
@@ -57,7 +94,7 @@ Compass Results:
 Dimension Scores (out of 100):
 ${dimensionScoresText}
 
-Discovery Journey Answers (20 questions + optional note):
+Personality Quiz Answers:
 ${JSON.stringify(assessment.answers, null, 2)}
 
 COACHING FOLLOW-UP HINTS based on adaptive signals:
@@ -66,6 +103,27 @@ COACHING FOLLOW-UP HINTS based on adaptive signals:
 - If careerChange: later ask "What kind of work would make you excited to wake up?"
 `;
 };
+
+export const BLUEPRINT_REFINE_PROMPT = (
+  existingBlueprint: LifeBlueprint,
+  feedback: string
+) => `
+The user wants to refine their existing LifeGPS Blueprint based on feedback.
+
+User Feedback:
+${feedback}
+
+Current Blueprint:
+${JSON.stringify(existingBlueprint, null, 2)}
+
+Regenerate the blueprint incorporating their feedback. If they say it feels too ambitious, make it more realistic. If they want more career or family focus, rebalance accordingly.
+
+Return ONLY valid JSON with the same structure as the original blueprint fields:
+archetypeSummary, compassScoreOverview, futureSelfSummary, currentStateAnalysis, dreamLifeVision, gapAnalysis,
+fiveYearRoadmap, twelveMonthPlan, ninetyDayActionPlan, sevenDayStarterPlan, dailyHabits,
+weeklyCheckInQuestions, weeklyPriorities, sideBusinessDirection, communicationGrowthPlan,
+burnoutRecoveryActions, financialFreedomNotes, recommendedFirstStep
+`;
 
 export const COACH_USER_PROMPT = (checkin: {
   progress: string;

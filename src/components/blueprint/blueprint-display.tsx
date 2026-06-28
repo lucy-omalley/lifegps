@@ -23,6 +23,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { BlueprintFeedback } from "@/components/blueprint/blueprint-feedback";
+import { Disclaimer } from "@/components/shared/disclaimer";
 import { Badge } from "@/components/ui/badge";
 import { ClientDate } from "@/components/ui/client-date";
 
@@ -100,9 +102,16 @@ function ListCard({
   );
 }
 
-export function BlueprintDisplay({ blueprint }: { blueprint: LifeBlueprint }) {
+export function BlueprintDisplay({
+  blueprint,
+  onBlueprintUpdate,
+}: {
+  blueprint: LifeBlueprint;
+  onBlueprintUpdate?: (blueprint: LifeBlueprint) => void;
+}) {
   return (
     <div className="space-y-8">
+      <Disclaimer />
       <div className="text-center">
         <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-teal-500/20 bg-teal-500/5 px-4 py-1.5 text-sm text-teal-700 dark:text-teal-300">
           <Sparkles className="h-4 w-4" />
@@ -254,6 +263,11 @@ export function BlueprintDisplay({ blueprint }: { blueprint: LifeBlueprint }) {
           </div>
         </CardContent>
       </Card>
+
+      <BlueprintFeedback
+        blueprint={blueprint}
+        onRefined={(refined) => onBlueprintUpdate?.(refined)}
+      />
     </div>
   );
 }

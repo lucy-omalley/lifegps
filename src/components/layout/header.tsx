@@ -13,23 +13,23 @@ export function Header() {
           <div className="flex flex-col">
             <span className="text-lg font-semibold tracking-tight">LifeGPS</span>
             <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
-              by RemoteGeek Hub
+              Discover Yourself
             </span>
           </div>
         </Link>
 
         <nav className="hidden items-center gap-6 md:flex">
           <Link
-            href="/#features"
+            href="/journey"
             className="text-sm text-muted-foreground transition-colors hover:text-foreground"
           >
-            Features
+            Journey
           </Link>
           <Link
-            href="/#pricing"
+            href="/profile"
             className="text-sm text-muted-foreground transition-colors hover:text-foreground"
           >
-            Pricing
+            Profile
           </Link>
           <Link
             href="/dashboard"
@@ -46,14 +46,14 @@ export function Header() {
             size="sm"
             className="hidden sm:inline-flex"
           >
-            Weekly Coach
+            Coach
           </ButtonLink>
           <ButtonLink
-            href="/assessment"
+            href="/journey"
             size="sm"
             className="bg-gradient-to-r from-teal-500 to-indigo-600 text-white shadow-md hover:from-teal-600 hover:to-indigo-700"
           >
-            Create Blueprint
+            Start Journey
           </ButtonLink>
         </div>
       </div>
