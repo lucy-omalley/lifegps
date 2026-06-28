@@ -124,14 +124,21 @@ Purpose · Career · Energy · Communication · Freedom · Execution
 2. Run the SQL in `supabase/schema.sql` in the SQL Editor  
    - If you already ran an older schema, also run `supabase/migrations/002_compass_persistence.sql`
 3. **Enable Anonymous Sign-In:** Dashboard → Authentication → Providers → Anonymous → Enable
-4. Add env vars to `.env.local`:
+4. **CAPTCHA (if enabled in Supabase):** If you turn on Bot and Abuse Protection, add Cloudflare Turnstile:
+   - Create a site at [Cloudflare Turnstile](https://dash.cloudflare.com/?to=/:account/turnstile)
+   - Supabase → Authentication → Bot and Abuse Protection → enable Turnstile and paste the **secret key**
+   - Add to `.env.local`: `NEXT_PUBLIC_TURNSTILE_SITE_KEY=your-site-key`
+   - Or disable CAPTCHA in Supabase for local development
+5. Add env vars to `.env.local`:
 
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+# Required when Supabase CAPTCHA / Turnstile is enabled:
+NEXT_PUBLIC_TURNSTILE_SITE_KEY=your-turnstile-site-key
 ```
 
-5. Restart the dev server
+6. Restart the dev server
 
 ### What gets stored
 
@@ -146,7 +153,7 @@ The app signs users in **anonymously** on first visit (cookie session). Data is 
 
 **Enable anonymous sign-in in Supabase:** Authentication → Providers → **Anonymous Sign-Ins** → Enable.
 
-If anonymous sign-in is disabled (or fails), the app automatically falls back to **localStorage only** for that browser — no repeated errors, and the app keeps working.
+If anonymous sign-in is disabled, CAPTCHA is misconfigured, or auth fails, the app falls back to **localStorage only** for that browser — the app keeps working; you can optionally complete a Turnstile check to enable cloud sync.
 
 Without Supabase env vars, the app also uses **localStorage only** (same as before).
 

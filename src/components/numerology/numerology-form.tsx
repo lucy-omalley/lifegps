@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
-import { ensureAuthenticatedUser } from "@/lib/auth";
+import { ensureAuthenticatedUserLegacy } from "@/lib/auth";
 import { canStartModule } from "@/lib/features";
 import { saveNumerologyReading, getDiscoveryProgress } from "@/lib/discovery/storage";
 import { LIFE_PATH_THEMES } from "@/lib/discovery/numerology";
@@ -40,7 +40,7 @@ export function NumerologyForm() {
 
     setLoading(true);
     try {
-      const user = await ensureAuthenticatedUser();
+      const user = await ensureAuthenticatedUserLegacy();
       const res = await fetch("/api/numerology", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

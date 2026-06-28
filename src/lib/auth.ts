@@ -3,6 +3,7 @@ import {
   createBrowserSupabaseClient,
   isSupabaseConfigured,
 } from "@/lib/supabase/client";
+import { isCaptchaError } from "@/lib/auth/captcha";
 
 const MOCK_USER_KEY = "lifegps_mock_user";
 const AUTH_MODE_KEY = "lifegps_auth_mode";
@@ -47,23 +48,69 @@ export function getAuthMode(): "supabase" | "local" {
   return localStorage.getItem(AUTH_MODE_KEY) === "local" ? "local" : "supabase";
 }
 
+export function enableLocalStorageOnly() {
+  setLocalAuthMode();
+}
+
 export function isDatabaseEnabled(): boolean {
   return isSupabaseConfigured() && getAuthMode() === "supabase";
 }
 
-function logAnonymousAuthUnavailable() {
+function logAnonymousAuthUnavailable(errorMessage?: string) {
   if (anonymousFailureLogged) return;
   anonymousFailureLogged = true;
+
+  if (isCaptchaError(errorMessage)) {
+    console.info(
+      "LifeGPS: Supabase CAPTCHA is required for sign-in. Add NEXT_PUBLIC_TURNSTILE_SITE_KEY to .env.local and configure the Turnstile secret in Supabase → Authentication → Bot and Abuse Protection. Or disable CAPTCHA there for development."
+    );
+    return;
+  }
+
   console.info(
-    "LifeGPS: Supabase anonymous sign-in is unavailable. Using local storage for this browser. To enable cloud sync, turn on Anonymous Sign-Ins in Supabase → Authentication → Providers."
+    "LifeGPS: Supabase anonymous sign-in is unavailable. Using local storage for this browser. Enable Anonymous Sign-Ins in Supabase → Authentication → Providers, or configure CAPTCHA if enabled."
   );
 }
 
-/** Ensure a Supabase session exists (anonymous sign-in). Falls back to mock user. */
-export async function ensureAuthenticatedUser(): Promise<MockUser> {
+function mapSupabaseUser(user: {
+  id: string;
+  email?: string | null;
+  user_metadata?: Record<string, unknown>;
+}): MockUser {
+  return {
+    id: user.id,
+    email: user.email ?? "anonymous@lifegps.app",
+    name: (user.user_metadata?.name as string | undefined) ?? "LifeGPS User",
+  };
+}
+
+/** Returns the current Supabase session user without signing in. */
+export async function getExistingAuthUser(): Promise<MockUser | null> {
+  const supabase = createBrowserSupabaseClient();
+  if (!supabase || getAuthMode() === "local") return null;
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  return user ? mapSupabaseUser(user) : null;
+}
+
+export type EnsureAuthResult =
+  | { status: "authenticated"; user: MockUser }
+  | { status: "captcha_required" }
+  | { status: "local_fallback"; user: MockUser };
+
+/**
+ * Ensure a Supabase session exists (anonymous sign-in).
+ * When Supabase CAPTCHA is enabled, pass captchaToken from Cloudflare Turnstile.
+ */
+export async function ensureAuthenticatedUser(options?: {
+  captchaToken?: string;
+}): Promise<EnsureAuthResult> {
   const supabase = createBrowserSupabaseClient();
   if (!supabase || getAuthMode() === "local") {
-    return getFallbackMockUser();
+    return { status: "local_fallback", user: getFallbackMockUser() };
   }
 
   const {
@@ -73,27 +120,46 @@ export async function ensureAuthenticatedUser(): Promise<MockUser> {
   if (existingUser) {
     setSupabaseAuthMode();
     return {
-      id: existingUser.id,
-      email: existingUser.email ?? "anonymous@lifegps.app",
-      name:
-        (existingUser.user_metadata?.name as string | undefined) ??
-        "LifeGPS User",
+      status: "authenticated",
+      user: mapSupabaseUser(existingUser),
     };
   }
 
-  const { data, error } = await supabase.auth.signInAnonymously();
+  const { data, error } = await supabase.auth.signInAnonymously(
+    options?.captchaToken
+      ? { options: { captchaToken: options.captchaToken } }
+      : undefined
+  );
+
   if (error || !data.user) {
-    logAnonymousAuthUnavailable();
+    if (isCaptchaError(error?.message) && !options?.captchaToken) {
+      logAnonymousAuthUnavailable(error?.message);
+      return { status: "captcha_required" };
+    }
+
+    logAnonymousAuthUnavailable(error?.message);
     setLocalAuthMode();
-    return getFallbackMockUser();
+    return { status: "local_fallback", user: getFallbackMockUser() };
   }
 
   setSupabaseAuthMode();
   return {
-    id: data.user.id,
-    email: data.user.email ?? "anonymous@lifegps.app",
-    name: "LifeGPS User",
+    status: "authenticated",
+    user: mapSupabaseUser(data.user),
   };
+}
+
+/** Convenience wrapper — returns a user in all cases (legacy callers). */
+export async function ensureAuthenticatedUserLegacy(
+  captchaToken?: string
+): Promise<MockUser> {
+  const result = await ensureAuthenticatedUser(
+    captchaToken ? { captchaToken } : undefined
+  );
+  if (result.status === "captcha_required") {
+    return getFallbackMockUser();
+  }
+  return result.user;
 }
 
 /** @deprecated Use ensureAuthenticatedUser */
@@ -118,5 +184,6 @@ export async function signOutUser() {
   if (typeof window !== "undefined") {
     localStorage.removeItem(MOCK_USER_KEY);
     localStorage.removeItem(AUTH_MODE_KEY);
+    anonymousFailureLogged = false;
   }
 }

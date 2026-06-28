@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getOpenAIClient } from "@/lib/openai/client";
 import {
   LIFEGPS_SYSTEM_PROMPT,
   BLUEPRINT_USER_PROMPT,
@@ -30,14 +31,14 @@ function generateMockBlueprint(
     results.sideBusinessReadiness.includes("Exploring");
 
   const showCommunication =
-    results.dimensionScores.communicationConfidence < 65 ||
+    results.dimensionScores.communication < 65 ||
     results.topGrowthAreas.some((g) => g.includes("Communication"));
 
   const showBurnout =
     results.burnoutRisk === "Medium" || results.burnoutRisk === "High";
 
   const showFinancial =
-    results.dimensionScores.financialFreedom >= 50 ||
+    results.dimensionScores.freedom >= 50 ||
     results.financialFreedomReadiness.includes("Developing") ||
     results.financialFreedomReadiness.includes("Strong");
 
@@ -56,7 +57,7 @@ function generateMockBlueprint(
       results.dimensionScores
     ),
     futureSelfSummary: `In five years, you have moved from uncertainty toward ${firstOutcome.toLowerCase()}. Your ${results.archetype.replace("The ", "").toLowerCase()} energy has guided you to build a life aligned with your values — with clearer direction, stronger habits, and meaningful progress in your priority areas.`,
-    currentStateAnalysis: `Your Compass assessment reveals a ${results.burnoutRisk.toLowerCase()} burnout risk profile. ${results.executionStyle}. Career energy scores ${results.dimensionScores.careerEnergy}/100, while energy & lifestyle sits at ${results.dimensionScores.energyLifestyle}/100. You are ${results.financialFreedomReadiness.toLowerCase()} regarding financial freedom, and ${results.sideBusinessReadiness.toLowerCase()} on side business exploration.`,
+    currentStateAnalysis: `Your Compass assessment reveals a ${results.burnoutRisk.toLowerCase()} burnout risk profile. ${results.executionStyle}. Career scores ${results.dimensionScores.career}/100, while energy sits at ${results.dimensionScores.energy}/100. You are ${results.financialFreedomReadiness.toLowerCase()} regarding financial freedom, and ${results.sideBusinessReadiness.toLowerCase()} on side business exploration.`,
     dreamLifeVision: `Your dream life centres on ${results.topStrengths[0]?.toLowerCase() ?? "purpose"} while addressing ${results.topGrowthAreas[0]?.toLowerCase() ?? "key growth areas"}. The first outcome you want from your blueprint is: ${firstOutcome}.`,
     gapAnalysis: `Key gaps exist between your current scores and your desired future. Focus areas: ${results.topGrowthAreas.join(" and ")}. Your ${results.burnoutRisk.toLowerCase()} burnout risk suggests ${showBurnout ? "energy recovery should be prioritised alongside goal pursuit" : "you have reasonable energy to pursue ambitious goals"}.`,
     fiveYearRoadmap: [

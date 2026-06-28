@@ -16,7 +16,7 @@ import {
   TOTAL_SECTIONS,
 } from "@/lib/compass/sections";
 import { buildAnswer, computeCompassResults } from "@/lib/compass/scoring";
-import { ensureAuthenticatedUser } from "@/lib/auth";
+import { ensureAuthenticatedUserLegacy } from "@/lib/auth";
 import {
   clearCompassSessionFromDatabase,
   syncCompassSessionToDatabase,
@@ -145,7 +145,7 @@ export function AssessmentForm() {
     setPhase("building-blueprint");
 
     try {
-      const authUser = await ensureAuthenticatedUser();
+      const authUser = await ensureAuthenticatedUserLegacy();
       const response = await fetch("/api/blueprint", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
