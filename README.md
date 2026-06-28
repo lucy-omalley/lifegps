@@ -144,7 +144,11 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 
 The app signs users in **anonymously** on first visit (cookie session). Data is protected by Row Level Security — each user only sees their own rows.
 
-Without Supabase env vars, the app falls back to **localStorage only** (same as before).
+**Enable anonymous sign-in in Supabase:** Authentication → Providers → **Anonymous Sign-Ins** → Enable.
+
+If anonymous sign-in is disabled (or fails), the app automatically falls back to **localStorage only** for that browser — no repeated errors, and the app keeps working.
+
+Without Supabase env vars, the app also uses **localStorage only** (same as before).
 
 > **Future:** Replace anonymous auth with email/OAuth in `src/lib/auth.ts` when ready for production accounts.
 

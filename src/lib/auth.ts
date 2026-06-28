@@ -5,6 +5,9 @@ import {
 } from "@/lib/supabase/client";
 
 const MOCK_USER_KEY = "lifegps_mock_user";
+const AUTH_MODE_KEY = "lifegps_auth_mode";
+
+let anonymousFailureLogged = false;
 
 function getFallbackMockUser(): MockUser {
   if (typeof window === "undefined") {
@@ -25,14 +28,41 @@ function getFallbackMockUser(): MockUser {
   return user;
 }
 
+function setLocalAuthMode() {
+  if (typeof window !== "undefined") {
+    localStorage.setItem(AUTH_MODE_KEY, "local");
+  }
+}
+
+function setSupabaseAuthMode() {
+  if (typeof window !== "undefined") {
+    localStorage.removeItem(AUTH_MODE_KEY);
+  }
+}
+
+/** Whether the client should sync data to Supabase (requires a live auth session). */
+export function getAuthMode(): "supabase" | "local" {
+  if (!isSupabaseConfigured()) return "local";
+  if (typeof window === "undefined") return "supabase";
+  return localStorage.getItem(AUTH_MODE_KEY) === "local" ? "local" : "supabase";
+}
+
 export function isDatabaseEnabled(): boolean {
-  return isSupabaseConfigured();
+  return isSupabaseConfigured() && getAuthMode() === "supabase";
+}
+
+function logAnonymousAuthUnavailable() {
+  if (anonymousFailureLogged) return;
+  anonymousFailureLogged = true;
+  console.info(
+    "LifeGPS: Supabase anonymous sign-in is unavailable. Using local storage for this browser. To enable cloud sync, turn on Anonymous Sign-Ins in Supabase → Authentication → Providers."
+  );
 }
 
 /** Ensure a Supabase session exists (anonymous sign-in). Falls back to mock user. */
 export async function ensureAuthenticatedUser(): Promise<MockUser> {
   const supabase = createBrowserSupabaseClient();
-  if (!supabase) {
+  if (!supabase || getAuthMode() === "local") {
     return getFallbackMockUser();
   }
 
@@ -41,6 +71,7 @@ export async function ensureAuthenticatedUser(): Promise<MockUser> {
   } = await supabase.auth.getUser();
 
   if (existingUser) {
+    setSupabaseAuthMode();
     return {
       id: existingUser.id,
       email: existingUser.email ?? "anonymous@lifegps.app",
@@ -52,10 +83,12 @@ export async function ensureAuthenticatedUser(): Promise<MockUser> {
 
   const { data, error } = await supabase.auth.signInAnonymously();
   if (error || !data.user) {
-    console.warn("Supabase anonymous sign-in failed:", error?.message);
+    logAnonymousAuthUnavailable();
+    setLocalAuthMode();
     return getFallbackMockUser();
   }
 
+  setSupabaseAuthMode();
   return {
     id: data.user.id,
     email: data.user.email ?? "anonymous@lifegps.app",
@@ -84,5 +117,6 @@ export async function signOutUser() {
   }
   if (typeof window !== "undefined") {
     localStorage.removeItem(MOCK_USER_KEY);
+    localStorage.removeItem(AUTH_MODE_KEY);
   }
 }
