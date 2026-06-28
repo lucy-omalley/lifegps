@@ -21,7 +21,7 @@ function generateMockBlueprint(
   const results = assessment.results!;
   const id = crypto.randomUUID();
   const firstOutcome =
-    assessment.answers.find((a) => a.questionId === 50)?.selectedAnswer ??
+    assessment.answers.find((a) => a.questionId === 19)?.selectedAnswer ??
     unifiedProfile?.growthRecommendations[0] ??
     "More clarity";
 
@@ -238,7 +238,8 @@ export async function POST(request: Request) {
     }
 
     const hasAssessment =
-      assessment?.results && assessment.answers.length >= 50;
+      assessment?.results &&
+      hasRequiredAnswers(assessment.answers ?? []);
     const hasProfile = Boolean(unifiedProfile);
 
     if (!hasAssessment && !hasProfile) {
@@ -334,6 +335,17 @@ export async function POST(request: Request) {
           console.error("Assessment insert error:", assessmentError);
         }
       }
+
+      const row = blueprintToRow(blueprint, assessmentId);
+      const { error: blueprintError } = await supabase
+        .from("life_blueprints")
+        .insert(row);
+
+      if (blueprintError) {
+        console.error("Blueprint insert error:", blueprintError);
+      }
+
+      await supabase.from("compass_sessions").delete().eq("user_id", user.id);
     }
 
     return NextResponse.json({
