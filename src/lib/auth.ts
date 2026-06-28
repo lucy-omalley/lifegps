@@ -68,7 +68,7 @@ export function mapSupabaseUser(user: {
 /** Returns the current Supabase session user without signing in. */
 export async function getExistingAuthUser(): Promise<MockUser | null> {
   const supabase = createBrowserSupabaseClient();
-  if (!supabase || getAuthMode() === "local") return null;
+  if (!supabase) return null;
 
   const {
     data: { user },
@@ -90,7 +90,7 @@ export type EnsureAuthResult =
 /** Check auth state. Does not sign in automatically. */
 export async function ensureAuthenticatedUser(): Promise<EnsureAuthResult> {
   const supabase = createBrowserSupabaseClient();
-  if (!supabase || getAuthMode() === "local") {
+  if (!supabase) {
     return { status: "local_fallback", user: getFallbackMockUser() };
   }
 

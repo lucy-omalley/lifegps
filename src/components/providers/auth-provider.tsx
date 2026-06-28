@@ -2,48 +2,43 @@
 
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import {
-  ensureAuthenticatedUser,
-  getAuthMode,
-  isPublicAuthPath,
-} from "@/lib/auth";
+import { ensureAuthenticatedUser, isPublicAuthPath } from "@/lib/auth";
 import { isSupabaseConfigured } from "@/lib/supabase/client";
 
-type AuthState = "checking" | "ready";
+type AuthState = "checking" | "allowed" | "needs_login";
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const [state, setState] = useState<AuthState>("checking");
+  const [authState, setAuthState] = useState<AuthState>("checking");
 
   useEffect(() => {
     let cancelled = false;
 
     async function checkAuth() {
-      if (!isSupabaseConfigured() || getAuthMode() === "local") {
-        if (!cancelled) setState("ready");
+      if (isPublicAuthPath(pathname)) {
+        if (!cancelled) setAuthState("allowed");
         return;
       }
 
-      if (isPublicAuthPath(pathname)) {
-        if (!cancelled) setState("ready");
+      if (!isSupabaseConfigured()) {
+        if (!cancelled) setAuthState("allowed");
         return;
       }
 
       const result = await ensureAuthenticatedUser();
-
       if (cancelled) return;
 
-      if (result.status === "authenticated" || result.status === "local_fallback") {
-        setState("ready");
+      if (result.status === "authenticated") {
+        setAuthState("allowed");
         return;
       }
 
-      const next = encodeURIComponent(pathname);
-      router.replace(`/login?next=${next}`);
+      setAuthState("needs_login");
+      router.replace(`/login?next=${encodeURIComponent(pathname)}`);
     }
 
-    setState("checking");
+    setAuthState("checking");
     void checkAuth();
 
     return () => {
@@ -51,10 +46,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [pathname, router]);
 
-  if (state === "checking" && !isPublicAuthPath(pathname)) {
+  const isProtectedRoute = !isPublicAuthPath(pathname) && isSupabaseConfigured();
+
+  if (isProtectedRoute && (authState === "checking" || authState === "needs_login")) {
     return (
       <div className="flex min-h-full flex-1 items-center justify-center">
-        <p className="text-sm text-muted-foreground">Loading...</p>
+        <p className="text-sm text-muted-foreground">
+          {authState === "needs_login" ? "Redirecting to sign in..." : "Loading..."}
+        </p>
       </div>
     );
   }
