@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Compass } from "lucide-react";
 import { ButtonLink } from "@/components/ui/button-link";
+import { UserMenu } from "@/components/layout/user-menu";
 
 export function Header() {
   return (
@@ -48,13 +49,7 @@ export function Header() {
           >
             Coach
           </ButtonLink>
-          <ButtonLink
-            href="/journey"
-            size="sm"
-            className="bg-gradient-to-r from-teal-500 to-indigo-600 text-white shadow-md hover:from-teal-600 hover:to-indigo-700"
-          >
-            Start Journey
-          </ButtonLink>
+          <UserMenu />
         </div>
       </div>
     </header>

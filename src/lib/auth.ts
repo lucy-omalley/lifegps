@@ -3,12 +3,9 @@ import {
   createBrowserSupabaseClient,
   isSupabaseConfigured,
 } from "@/lib/supabase/client";
-import { isCaptchaError } from "@/lib/auth/captcha";
 
 const MOCK_USER_KEY = "lifegps_mock_user";
 const AUTH_MODE_KEY = "lifegps_auth_mode";
-
-let anonymousFailureLogged = false;
 
 function getFallbackMockUser(): MockUser {
   if (typeof window === "undefined") {
@@ -56,23 +53,7 @@ export function isDatabaseEnabled(): boolean {
   return isSupabaseConfigured() && getAuthMode() === "supabase";
 }
 
-function logAnonymousAuthUnavailable(errorMessage?: string) {
-  if (anonymousFailureLogged) return;
-  anonymousFailureLogged = true;
-
-  if (isCaptchaError(errorMessage)) {
-    console.info(
-      "LifeGPS: Supabase CAPTCHA is required for sign-in. Add NEXT_PUBLIC_TURNSTILE_SITE_KEY to .env.local and configure the Turnstile secret in Supabase → Authentication → Bot and Abuse Protection. Or disable CAPTCHA there for development."
-    );
-    return;
-  }
-
-  console.info(
-    "LifeGPS: Supabase anonymous sign-in is unavailable. Using local storage for this browser. Enable Anonymous Sign-Ins in Supabase → Authentication → Providers, or configure CAPTCHA if enabled."
-  );
-}
-
-function mapSupabaseUser(user: {
+export function mapSupabaseUser(user: {
   id: string;
   email?: string | null;
   user_metadata?: Record<string, unknown>;
@@ -93,73 +74,75 @@ export async function getExistingAuthUser(): Promise<MockUser | null> {
     data: { user },
   } = await supabase.auth.getUser();
 
-  return user ? mapSupabaseUser(user) : null;
+  if (user) {
+    setSupabaseAuthMode();
+    return mapSupabaseUser(user);
+  }
+
+  return null;
 }
 
 export type EnsureAuthResult =
   | { status: "authenticated"; user: MockUser }
-  | { status: "captcha_required" }
+  | { status: "unauthenticated" }
   | { status: "local_fallback"; user: MockUser };
 
-/**
- * Ensure a Supabase session exists (anonymous sign-in).
- * When Supabase CAPTCHA is enabled, pass captchaToken from Cloudflare Turnstile.
- */
-export async function ensureAuthenticatedUser(options?: {
-  captchaToken?: string;
-}): Promise<EnsureAuthResult> {
+/** Check auth state. Does not sign in automatically. */
+export async function ensureAuthenticatedUser(): Promise<EnsureAuthResult> {
   const supabase = createBrowserSupabaseClient();
   if (!supabase || getAuthMode() === "local") {
     return { status: "local_fallback", user: getFallbackMockUser() };
   }
 
-  const {
-    data: { user: existingUser },
-  } = await supabase.auth.getUser();
-
-  if (existingUser) {
-    setSupabaseAuthMode();
-    return {
-      status: "authenticated",
-      user: mapSupabaseUser(existingUser),
-    };
+  const user = await getExistingAuthUser();
+  if (user) {
+    return { status: "authenticated", user };
   }
 
-  const { data, error } = await supabase.auth.signInAnonymously(
-    options?.captchaToken
-      ? { options: { captchaToken: options.captchaToken } }
-      : undefined
-  );
-
-  if (error || !data.user) {
-    if (isCaptchaError(error?.message) && !options?.captchaToken) {
-      logAnonymousAuthUnavailable(error?.message);
-      return { status: "captcha_required" };
-    }
-
-    logAnonymousAuthUnavailable(error?.message);
-    setLocalAuthMode();
-    return { status: "local_fallback", user: getFallbackMockUser() };
-  }
-
-  setSupabaseAuthMode();
-  return {
-    status: "authenticated",
-    user: mapSupabaseUser(data.user),
-  };
+  return { status: "unauthenticated" };
 }
 
-/** Convenience wrapper — returns a user in all cases (legacy callers). */
-export async function ensureAuthenticatedUserLegacy(
-  captchaToken?: string
-): Promise<MockUser> {
-  const result = await ensureAuthenticatedUser(
-    captchaToken ? { captchaToken } : undefined
-  );
-  if (result.status === "captcha_required") {
-    return getFallbackMockUser();
+/** Convenience wrapper — returns a user when authenticated or in local mode. */
+export async function ensureAuthenticatedUserLegacy(): Promise<MockUser> {
+  const result = await ensureAuthenticatedUser();
+  if (result.status === "unauthenticated") {
+    throw new Error("Not authenticated");
   }
   return result.user;
+}
+
+export async function sendMagicLink(
+  email: string,
+  options?: { captchaToken?: string; next?: string }
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const supabase = createBrowserSupabaseClient();
+  if (!supabase) {
+    return { ok: false, error: "Supabase is not configured" };
+  }
+
+  if (typeof window === "undefined") {
+    return { ok: false, error: "Magic link must be sent from the browser" };
+  }
+
+  const next = options?.next ?? "/journey";
+  const callbackUrl = new URL("/auth/callback", window.location.origin);
+  callbackUrl.searchParams.set("next", next);
+
+  const { error } = await supabase.auth.signInWithOtp({
+    email: email.trim(),
+    options: {
+      emailRedirectTo: callbackUrl.toString(),
+      ...(options?.captchaToken
+        ? { captchaToken: options.captchaToken }
+        : {}),
+    },
+  });
+
+  if (error) {
+    return { ok: false, error: error.message };
+  }
+
+  return { ok: true };
 }
 
 /** @deprecated Use ensureAuthenticatedUser */
@@ -184,6 +167,13 @@ export async function signOutUser() {
   if (typeof window !== "undefined") {
     localStorage.removeItem(MOCK_USER_KEY);
     localStorage.removeItem(AUTH_MODE_KEY);
-    anonymousFailureLogged = false;
   }
+}
+
+export const PUBLIC_AUTH_PATHS = ["/", "/login", "/auth/callback"];
+
+export function isPublicAuthPath(pathname: string): boolean {
+  return PUBLIC_AUTH_PATHS.some(
+    (path) => pathname === path || pathname.startsWith("/auth/callback")
+  );
 }

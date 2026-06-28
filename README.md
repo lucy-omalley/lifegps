@@ -123,13 +123,15 @@ Purpose · Career · Energy · Communication · Freedom · Execution
 1. Create a project at [supabase.com](https://supabase.com)
 2. Run the SQL in `supabase/schema.sql` in the SQL Editor  
    - If you already ran an older schema, also run `supabase/migrations/002_compass_persistence.sql`
-3. **Enable Anonymous Sign-In:** Dashboard → Authentication → Providers → Anonymous → Enable
-4. **CAPTCHA (if enabled in Supabase):** If you turn on Bot and Abuse Protection, add Cloudflare Turnstile:
+3. **Enable Email auth:** Dashboard → Authentication → Providers → **Email** → Enable (magic link / OTP)
+4. **Redirect URLs:** Authentication → URL Configuration → add:
+   - Site URL: `http://localhost:3000` (or your production domain)
+   - Redirect URLs: `http://localhost:3000/auth/callback` and your production callback URL
+5. **CAPTCHA (optional):** If you turn on Bot and Abuse Protection, add Cloudflare Turnstile:
    - Create a site at [Cloudflare Turnstile](https://dash.cloudflare.com/?to=/:account/turnstile)
    - Supabase → Authentication → Bot and Abuse Protection → enable Turnstile and paste the **secret key**
    - Add to `.env.local`: `NEXT_PUBLIC_TURNSTILE_SITE_KEY=your-site-key`
-   - Or disable CAPTCHA in Supabase for local development
-5. Add env vars to `.env.local`:
+6. Add env vars to `.env.local`:
 
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
@@ -138,7 +140,13 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 NEXT_PUBLIC_TURNSTILE_SITE_KEY=your-turnstile-site-key
 ```
 
-6. Restart the dev server
+7. Restart the dev server
+
+### Authentication flow
+
+Users sign in at **`/login`** with an **email magic link** (no password). After clicking the link in their email, Supabase redirects to `/auth/callback`, which creates a session cookie. Protected routes (journey, assessment, profile, etc.) require sign-in when Supabase is configured.
+
+The landing page (`/`) is public. Without Supabase env vars, the app uses **localStorage only**.
 
 ### What gets stored
 
@@ -149,15 +157,9 @@ NEXT_PUBLIC_TURNSTILE_SITE_KEY=your-turnstile-site-key
 | `life_blueprints` | Full AI-generated blueprint |
 | `weekly_checkins` | Coach check-in history |
 
-The app signs users in **anonymously** on first visit (cookie session). Data is protected by Row Level Security — each user only sees their own rows.
+Data is protected by Row Level Security — each signed-in user only sees their own rows.
 
-**Enable anonymous sign-in in Supabase:** Authentication → Providers → **Anonymous Sign-Ins** → Enable.
-
-If anonymous sign-in is disabled, CAPTCHA is misconfigured, or auth fails, the app falls back to **localStorage only** for that browser — the app keeps working; you can optionally complete a Turnstile check to enable cloud sync.
-
-Without Supabase env vars, the app also uses **localStorage only** (same as before).
-
-> **Future:** Replace anonymous auth with email/OAuth in `src/lib/auth.ts` when ready for production accounts.
+Without Supabase env vars, the app uses **localStorage only** (same as before).
 
 ## Founder Agent (Internal)
 
