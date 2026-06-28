@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Sparkles, ArrowRight } from "lucide-react";
-import { ensureAuthenticatedUser } from "@/lib/auth";
+import { ensureAuthenticatedUserLegacy } from "@/lib/auth";
 import {
   canAccessFullProfile,
   canGenerateFullBlueprint,
@@ -58,7 +58,7 @@ export function UnifiedProfileView() {
     setLoading(true);
     setError(null);
     try {
-      const user = await ensureAuthenticatedUser();
+      const user = await ensureAuthenticatedUserLegacy();
       const modules = getAllModuleData();
       const assessment = getAssessment();
 
@@ -92,7 +92,7 @@ export function UnifiedProfileView() {
     setGenerating(true);
     setError(null);
     try {
-      const user = await ensureAuthenticatedUser();
+      const user = await ensureAuthenticatedUserLegacy();
       const assessment = getAssessment();
 
       const res = await fetch("/api/blueprint", {

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
-import { ensureAuthenticatedUser } from "@/lib/auth";
+import { ensureAuthenticatedUserLegacy } from "@/lib/auth";
 import { canStartModule } from "@/lib/features";
 import { savePalmReading, getDiscoveryProgress } from "@/lib/discovery/storage";
 import { ImageUpload } from "@/components/discovery/image-upload";
@@ -35,7 +35,7 @@ export function PalmReadingForm() {
 
     setLoading(true);
     try {
-      const user = await ensureAuthenticatedUser();
+      const user = await ensureAuthenticatedUserLegacy();
       const res = await fetch("/api/palm-reading", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

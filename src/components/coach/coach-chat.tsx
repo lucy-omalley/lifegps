@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Loader2, Send, Bot, User } from "lucide-react";
-import { ensureAuthenticatedUser } from "@/lib/auth";
+import { ensureAuthenticatedUserLegacy } from "@/lib/auth";
 import { saveCheckin } from "@/lib/storage";
 import type { WeeklyCheckin } from "@/types";
 import { Button } from "@/components/ui/button";
@@ -59,7 +59,7 @@ export function CoachChat() {
     setSubmitted(true);
 
     try {
-      await ensureAuthenticatedUser();
+      await ensureAuthenticatedUserLegacy();
       const response = await fetch("/api/coach", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

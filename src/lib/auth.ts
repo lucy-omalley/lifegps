@@ -3,8 +3,10 @@ import {
   createBrowserSupabaseClient,
   isSupabaseConfigured,
 } from "@/lib/supabase/client";
+import { GUEST_COOKIE_NAME } from "@/lib/auth/paths";
 
 const MOCK_USER_KEY = "lifegps_mock_user";
+const AUTH_MODE_KEY = "lifegps_auth_mode";
 
 function getFallbackMockUser(): MockUser {
   if (typeof window === "undefined") {
@@ -25,42 +27,123 @@ function getFallbackMockUser(): MockUser {
   return user;
 }
 
-export function isDatabaseEnabled(): boolean {
-  return isSupabaseConfigured();
+function setLocalAuthMode() {
+  if (typeof window !== "undefined") {
+    localStorage.setItem(AUTH_MODE_KEY, "local");
+  }
 }
 
-/** Ensure a Supabase session exists (anonymous sign-in). Falls back to mock user. */
-export async function ensureAuthenticatedUser(): Promise<MockUser> {
-  const supabase = createBrowserSupabaseClient();
-  if (!supabase) {
-    return getFallbackMockUser();
+function setSupabaseAuthMode() {
+  if (typeof window !== "undefined") {
+    localStorage.removeItem(AUTH_MODE_KEY);
   }
+}
+
+/** Whether the client should sync data to Supabase (requires a live auth session). */
+export function getAuthMode(): "supabase" | "local" {
+  if (!isSupabaseConfigured()) return "local";
+  if (typeof window === "undefined") return "supabase";
+  return localStorage.getItem(AUTH_MODE_KEY) === "local" ? "local" : "supabase";
+}
+
+export function enableLocalStorageOnly() {
+  setLocalAuthMode();
+}
+
+export function isDatabaseEnabled(): boolean {
+  return isSupabaseConfigured() && getAuthMode() === "supabase";
+}
+
+export function mapSupabaseUser(user: {
+  id: string;
+  email?: string | null;
+  user_metadata?: Record<string, unknown>;
+}): MockUser {
+  return {
+    id: user.id,
+    email: user.email ?? "anonymous@lifegps.app",
+    name: (user.user_metadata?.name as string | undefined) ?? "LifeGPS User",
+  };
+}
+
+/** Returns the current Supabase session user without signing in. */
+export async function getExistingAuthUser(): Promise<MockUser | null> {
+  const supabase = createBrowserSupabaseClient();
+  if (!supabase) return null;
 
   const {
-    data: { user: existingUser },
+    data: { user },
   } = await supabase.auth.getUser();
 
-  if (existingUser) {
-    return {
-      id: existingUser.id,
-      email: existingUser.email ?? "anonymous@lifegps.app",
-      name:
-        (existingUser.user_metadata?.name as string | undefined) ??
-        "LifeGPS User",
-    };
+  if (user) {
+    setSupabaseAuthMode();
+    return mapSupabaseUser(user);
   }
 
-  const { data, error } = await supabase.auth.signInAnonymously();
-  if (error || !data.user) {
-    console.warn("Supabase anonymous sign-in failed:", error?.message);
-    return getFallbackMockUser();
+  return null;
+}
+
+export type EnsureAuthResult =
+  | { status: "authenticated"; user: MockUser }
+  | { status: "unauthenticated" }
+  | { status: "local_fallback"; user: MockUser };
+
+/** Check auth state. Does not sign in automatically. */
+export async function ensureAuthenticatedUser(): Promise<EnsureAuthResult> {
+  const supabase = createBrowserSupabaseClient();
+  if (!supabase) {
+    return { status: "local_fallback", user: getFallbackMockUser() };
   }
 
-  return {
-    id: data.user.id,
-    email: data.user.email ?? "anonymous@lifegps.app",
-    name: "LifeGPS User",
-  };
+  const user = await getExistingAuthUser();
+  if (user) {
+    return { status: "authenticated", user };
+  }
+
+  return { status: "unauthenticated" };
+}
+
+/** Convenience wrapper — returns a user when authenticated or in local mode. */
+export async function ensureAuthenticatedUserLegacy(): Promise<MockUser> {
+  const result = await ensureAuthenticatedUser();
+  if (result.status === "unauthenticated") {
+    throw new Error("Not authenticated");
+  }
+  return result.user;
+}
+
+export async function sendMagicLink(
+  email: string,
+  options?: { captchaToken?: string; next?: string }
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const supabase = createBrowserSupabaseClient();
+  if (!supabase) {
+    return { ok: false, error: "Supabase is not configured" };
+  }
+
+  if (typeof window === "undefined") {
+    return { ok: false, error: "Magic link must be sent from the browser" };
+  }
+
+  const next = options?.next ?? "/journey";
+  const callbackUrl = new URL("/auth/callback", window.location.origin);
+  callbackUrl.searchParams.set("next", next);
+
+  const { error } = await supabase.auth.signInWithOtp({
+    email: email.trim(),
+    options: {
+      emailRedirectTo: callbackUrl.toString(),
+      ...(options?.captchaToken
+        ? { captchaToken: options.captchaToken }
+        : {}),
+    },
+  });
+
+  if (error) {
+    return { ok: false, error: error.message };
+  }
+
+  return { ok: true };
 }
 
 /** @deprecated Use ensureAuthenticatedUser */
@@ -84,5 +167,28 @@ export async function signOutUser() {
   }
   if (typeof window !== "undefined") {
     localStorage.removeItem(MOCK_USER_KEY);
+    localStorage.removeItem(AUTH_MODE_KEY);
+    clearGuestSession();
   }
 }
+
+export function setGuestSession() {
+  if (typeof document !== "undefined") {
+    document.cookie = `${GUEST_COOKIE_NAME}=1; path=/; max-age=604800; SameSite=Lax`;
+  }
+  if (typeof window !== "undefined") {
+    sessionStorage.setItem(GUEST_COOKIE_NAME, "1");
+  }
+  enableLocalStorageOnly();
+}
+
+export function clearGuestSession() {
+  if (typeof document !== "undefined") {
+    document.cookie = `${GUEST_COOKIE_NAME}=; path=/; max-age=0; SameSite=Lax`;
+  }
+  if (typeof window !== "undefined") {
+    sessionStorage.removeItem(GUEST_COOKIE_NAME);
+  }
+}
+
+export { isPublicAuthPath, isProtectedAuthPath } from "@/lib/auth/paths";
